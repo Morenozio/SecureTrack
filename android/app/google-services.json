@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "922542220464",
+    "project_id": "fir-38b88",
+    "storage_bucket": "fir-38b88.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:922542220464:android:f3fe36f13ca5bf11f50775",
+        "android_client_info": {
+          "package_name": "com.secure.track.securetrack"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzv2VEVq_HzD39i_i06oshVGvXNBfFQAw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
