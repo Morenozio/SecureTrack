@@ -69,54 +69,37 @@ class AdminDashboardScreen extends ConsumerWidget {
             StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: employeesStream,
               builder: (context, snapshot) {
-                final count = snapshot.data?.docs.length ?? 0;
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    _StatCard(title: 'Total Karyawan', value: '$count', icon: Icons.people_alt_outlined),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _SectionCard(
-              title: 'Monitoring Absensi Terbaru',
-              children: [
-                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: recentLogs,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: LinearProgressIndicator(),
-                      );
-                    }
-                    final docs = snapshot.data?.docs ?? [];
-                    if (docs.isEmpty) {
-                      return const ListTile(
-                        title: Text('Belum ada log absensi'),
-                      );
-                    }
-                    return Column(
-                      children: docs.map((d) {
-                        final data = d.data();
-                        final userId = data['userId'] ?? '-';
-                        final checkIn = (data['checkIn'] as Timestamp?)?.toDate();
-                        final checkOut = (data['checkOut'] as Timestamp?)?.toDate();
-                        final method = data['method'] ?? '-';
-                        return ListTile(
-                          leading: const Icon(Icons.schedule),
-                          title: Text('User: $userId'),
-                          subtitle: Text(
-                            'In: ${checkIn ?? '-'}\nOut: ${checkOut ?? '-'}\nMetode: $method',
-                          ),
-                        );
-                      }).toList(),
+                final employeesCount = snapshot.data?.docs.length ?? 0;
+                final allUsersStream = ref.watch(usersCollectionProvider).snapshots();
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: allUsersStream,
+                  builder: (context, allUsersSnapshot) {
+                    final allUsersCount = allUsersSnapshot.data?.docs.length ?? 0;
+                    final adminsCount = allUsersCount - employeesCount;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _StatCard(
+                          title: 'Total User',
+                          value: '$allUsersCount',
+                          icon: Icons.people,
+                        ),
+                        _StatCard(
+                          title: 'Admin',
+                          value: '$adminsCount',
+                          icon: Icons.admin_panel_settings,
+                        ),
+                        _StatCard(
+                          title: 'Karyawan',
+                          value: '$employeesCount',
+                          icon: Icons.person,
+                        ),
+                      ],
                     );
                   },
-                ),
-              ],
+                );
+              },
             ),
             const SizedBox(height: 12),
             _SectionCard(
@@ -129,9 +112,76 @@ class AdminDashboardScreen extends ConsumerWidget {
                     _QuickAction(
                       label: 'Tambah Karyawan',
                       icon: Icons.person_add_alt,
-                      onTap: () => context.push('/auth/employee/signup'),
+                      onTap: () => context.push('/admin/add-employee'),
+                    ),
+                    _QuickAction(
+                      label: 'Daftar Karyawan',
+                      icon: Icons.people,
+                      onTap: () => context.push('/admin/employees'),
+                    ),
+                    _QuickAction(
+                      label: 'Kelola WiFi Networks',
+                      icon: Icons.wifi,
+                      onTap: () => context.push('/admin/wifi-networks'),
+                    ),
+                    _QuickAction(
+                      label: 'Kelola User',
+                      icon: Icons.admin_panel_settings,
+                      onTap: () => context.push('/admin/users'),
                     ),
                   ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _SectionCard(
+              title: 'Monitoring Absensi Terbaru',
+              children: [
+                // Ambil peta userId -> nama untuk menampilkan nama karyawan di log.
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: ref.watch(usersCollectionProvider).snapshots(),
+                  builder: (context, usersSnapshot) {
+                    final userDocs = usersSnapshot.data?.docs ?? [];
+                    final Map<String, String> userNameById = {
+                      for (final doc in userDocs)
+                        doc.id: (doc.data()['name'] ?? doc.id).toString(),
+                    };
+
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: recentLogs,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: LinearProgressIndicator(),
+                          );
+                        }
+                        final docs = snapshot.data?.docs ?? [];
+                        if (docs.isEmpty) {
+                          return const ListTile(
+                            title: Text('Belum ada log absensi'),
+                          );
+                        }
+                        return Column(
+                          children: docs.map((d) {
+                            final data = d.data();
+                            final userId = data['userId'] ?? '-';
+                            final userName = userNameById[userId] ?? userId.toString();
+                            final checkIn = (data['checkIn'] as Timestamp?)?.toDate();
+                            final checkOut = (data['checkOut'] as Timestamp?)?.toDate();
+                            final method = data['method'] ?? '-';
+                            return ListTile(
+                              leading: const Icon(Icons.schedule),
+                              title: Text('User: $userName'),
+                              subtitle: Text(
+                                'In: ${checkIn ?? '-'}\nOut: ${checkOut ?? '-'}\nMetode: $method',
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    );
+                  },
                 ),
               ],
             ),
@@ -159,7 +209,16 @@ class EmployeeDashboardScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        leading: context.canPop() ? const BackButton() : null,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/dashboard/employee');
+            }
+          },
+        ),
         title: const Text('Dashboard Karyawan'),
         actions: [
           IconButton(
@@ -220,9 +279,7 @@ class EmployeeDashboardScreen extends ConsumerWidget {
                           child: ElevatedButton.icon(
                             onPressed: user == null
                                 ? null
-                                : () async {
-                                    await ref.read(attendanceControllerProvider.notifier).checkIn(user);
-                                  },
+                                : () => context.push('/attendance'),
                             icon: const Icon(Icons.login),
                             label: const Text('Check-in'),
                           ),
@@ -232,9 +289,7 @@ class EmployeeDashboardScreen extends ConsumerWidget {
                           child: OutlinedButton.icon(
                             onPressed: user == null
                                 ? null
-                                : () async {
-                                    await ref.read(attendanceControllerProvider.notifier).checkOut(user);
-                                  },
+                                : () => context.push('/attendance'),
                             icon: const Icon(Icons.logout),
                             label: const Text('Check-out'),
                           ),

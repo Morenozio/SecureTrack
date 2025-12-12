@@ -2,11 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase/firebase_providers.dart';
+import 'wifi_network_repository.dart';
 
 class AttendanceRepository {
-  AttendanceRepository(this._db);
+  AttendanceRepository(this._db, this._wifiRepo);
 
   final FirebaseFirestore _db;
+  final WifiNetworkRepository _wifiRepo;
 
   CollectionReference<Map<String, dynamic>> get _logs =>
       _db.collection('attendanceLogs');
@@ -27,11 +29,28 @@ class AttendanceRepository {
     required String userId,
     required String? deviceId,
     required String method,
+    required String ssid,
+    required String bssid,
   }) async {
+    // Verify WiFi network
+    final isValid = await _wifiRepo.verifyWifiNetwork(
+      ssid: ssid,
+      bssid: bssid,
+    );
+
+    if (!isValid) {
+      throw Exception(
+          'Check-in ditolak: Perangkat tidak terhubung ke WiFi kantor yang terdaftar.\n'
+          'SSID: $ssid\n'
+          'BSSID: $bssid');
+    }
+
     await _logs.add({
       'userId': userId,
       'deviceId': deviceId,
       'method': method,
+      'wifiSsid': ssid,
+      'wifiBssid': bssid.toLowerCase(), // Store normalized BSSID
       'checkIn': FieldValue.serverTimestamp(),
       'checkOut': null,
       'createdAt': FieldValue.serverTimestamp(),
@@ -54,9 +73,59 @@ class AttendanceRepository {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  Future<void> addManualLog({
+    required String userId,
+    String? deviceId,
+    required DateTime checkIn,
+    DateTime? checkOut,
+    String? ssid,
+    String? bssid,
+    String? status,
+  }) async {
+    await _logs.add({
+      'userId': userId,
+      'deviceId': deviceId,
+      'method': 'manual',
+      'wifiSsid': ssid,
+      'wifiBssid': bssid?.toLowerCase(),
+      'checkIn': Timestamp.fromDate(checkIn),
+      'checkOut': checkOut != null ? Timestamp.fromDate(checkOut) : null,
+      'status': status,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> updateLog({
+    required String logId,
+    DateTime? checkIn,
+    DateTime? checkOut,
+    String? ssid,
+    String? bssid,
+    String? status,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (checkIn != null) updates['checkIn'] = Timestamp.fromDate(checkIn);
+    if (checkOut != null) updates['checkOut'] = Timestamp.fromDate(checkOut);
+    if (ssid != null) updates['wifiSsid'] = ssid;
+    if (bssid != null) updates['wifiBssid'] = bssid.toLowerCase();
+    if (status != null) updates['status'] = status;
+    if (updates.isEmpty) return;
+    updates['updatedAt'] = FieldValue.serverTimestamp();
+    await _logs.doc(logId).update(updates);
+  }
 }
 
 final attendanceRepositoryProvider = Provider<AttendanceRepository>((ref) {
-  return AttendanceRepository(ref.watch(firestoreProvider));
+  return AttendanceRepository(
+    ref.watch(firestoreProvider),
+    ref.watch(wifiNetworkRepositoryProvider),
+  );
 });
+
+
+
+
+
 

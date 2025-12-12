@@ -31,7 +31,16 @@ class _LeaveRequestScreenState extends ConsumerState<LeaveRequestScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: context.canPop() ? const BackButton() : null,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/dashboard/employee');
+            }
+          },
+        ),
         title: const Text('Permohonan Cuti'),
       ),
       body: AppBackground(

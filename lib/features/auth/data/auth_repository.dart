@@ -44,12 +44,10 @@ class AuthRepository {
   }
 
   Future<AppUser> adminSignUp({
-    required String adminCode,
     required String name,
     required String email,
     required String password,
   }) async {
-    await _validateAdminCode(adminCode);
     final cred = await _auth.createUserWithEmailAndPassword(email: email, password: password);
     final uid = cred.user!.uid;
 
@@ -59,18 +57,12 @@ class AuthRepository {
       'role': 'admin',
       'contact': '',
       'deviceId': null,
-      'adminCodeUsed': adminCode,
+      'isActive': true,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
     await _db.collection('users').doc(uid).set(userData);
-
-    await _db.collection('adminCodes').doc(adminCode).update({
-      'used': true,
-      'usedBy': uid,
-      'usedAt': FieldValue.serverTimestamp(),
-    });
 
     return AppUser(
       id: uid,
@@ -98,6 +90,7 @@ class AuthRepository {
       'role': 'employee',
       'contact': contact ?? '',
       'deviceId': deviceId,
+      'isActive': true,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -130,15 +123,16 @@ class AuthRepository {
     final doc = await _db.collection('users').doc(uid).get();
     final data = doc.data();
     final savedDevice = data?['deviceId'] as String?;
+    final isActive = (data?['isActive'] ?? true) as bool;
 
-    if (savedDevice == null || savedDevice.isEmpty) {
-      // bind the first device
-      await doc.reference.update({'deviceId': deviceId, 'updatedAt': FieldValue.serverTimestamp()});
-      return;
-    }
-    if (savedDevice != deviceId) {
+    if (!isActive) {
       await _auth.signOut();
-      throw Exception('Perangkat berbeda. Akses ditolak dan admin akan diberi notifikasi.');
+      throw Exception('Akun karyawan ini non-aktif. Hubungi admin.');
+    }
+
+    // Untuk sementara, izinkan login tanpa cek perangkat.
+    if (savedDevice == null || savedDevice.isEmpty) {
+      await doc.reference.update({'deviceId': deviceId, 'updatedAt': FieldValue.serverTimestamp()});
     }
   }
 
@@ -166,6 +160,7 @@ class AuthRepository {
         'role': 'employee',
         'contact': '',
         'deviceId': deviceId,
+        'isActive': true,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -176,18 +171,21 @@ class AuthRepository {
     }
 
     final role = (data['role'] ?? '') as String;
+    final isActive = (data['isActive'] ?? true) as bool;
     String? savedDevice = data['deviceId'] as String?;
 
     if (role == 'employee') {
+      if (!isActive) {
+        await _auth.signOut();
+        throw Exception('Akun karyawan ini non-aktif. Hubungi admin.');
+      }
+      // Untuk sementara, izinkan login tanpa cek perangkat.
       if (savedDevice == null || savedDevice.isEmpty) {
         await docRef.update({
           'deviceId': deviceId,
           'updatedAt': FieldValue.serverTimestamp(),
         });
         savedDevice = deviceId;
-      } else if (savedDevice != deviceId) {
-        await _auth.signOut();
-        throw Exception('Perangkat berbeda. Akses ditolak dan admin akan diberi notifikasi.');
       }
     }
 
@@ -197,17 +195,58 @@ class AuthRepository {
     });
   }
 
-  Future<void> _validateAdminCode(String code) async {
-    final doc = await _db.collection('adminCodes').doc(code).get();
-    if (!doc.exists) {
-      throw Exception('Admin code tidak valid.');
+  Future<void> updateUserRole({
+    required String userId,
+    required String newRole,
+  }) async {
+    if (newRole != 'admin' && newRole != 'employee') {
+      throw Exception('Role tidak valid. Harus "admin" atau "employee".');
     }
-    final data = doc.data()!;
-    final isActive = data['isActive'] as bool? ?? false;
-    final used = data['used'] as bool? ?? false;
-    if (!isActive || used) {
-      throw Exception('Admin code sudah digunakan / tidak aktif.');
+    
+    await _db.collection('users').doc(userId).update({
+      'role': newRole,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> updateUserProfile({
+    required String userId,
+    String? name,
+    String? email,
+    String? contact,
+    String? role,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name.trim();
+    if (email != null) updates['email'] = email.trim();
+    if (contact != null) updates['contact'] = contact.trim();
+    if (role != null) {
+      if (role != 'admin' && role != 'employee') {
+        throw Exception('Role tidak valid. Harus "admin" atau "employee".');
+      }
+      updates['role'] = role;
     }
+    if (updates.isEmpty) return;
+    updates['updatedAt'] = FieldValue.serverTimestamp();
+    await _db.collection('users').doc(userId).update(updates);
+  }
+
+  Future<void> setUserActiveStatus({
+    required String userId,
+    required bool isActive,
+  }) async {
+    await _db.collection('users').doc(userId).update({
+      'isActive': isActive,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> deleteUserDoc({required String userId}) async {
+    await _db.collection('users').doc(userId).delete();
+  }
+
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    await _auth.sendPasswordResetEmail(email: email);
   }
 
   Future<String> _deviceId() async {

@@ -1,16 +1,19 @@
-# securetrack
+# SecureTrack
 
-Attendance app
+Developed a secure employee attendance management system with multi-layered validation and real-time monitoring capabilities
 
-## Getting Started
+◦ Implemented unified authentication system that automatically detects user roles (Admin/Employee) after login and validates admin registration with unique admin codes
 
-This project is a starting point for a Flutter application.
+◦ Built real-time attendance tracking with WiFi IP validation, GPS location verification, and QR code backup method for emergency situations
 
-A few resources to get you started if this is your first Flutter project:
+◦ Designed secure device binding system that links each employee account to a single device ID to prevent unauthorized access from other devices
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+◦ Created comprehensive admin dashboard with live attendance monitoring, employee management (add/edit/delete), and real-time data visualization from Firebase
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+◦ Developed dual-role interface with separate dashboards for admins (monitoring, reporting, employee management) and employees (check-in/out, leave requests, attendance history)
+
+◦ Integrated Firebase backend (Auth, Firestore, Storage) with MVVM architecture using Riverpod for state management and GoRouter for navigation
+
+◦ Implemented dark mode and light mode themes with navy blue and white color scheme, allowing users to toggle between themes with persistent preferences
+
+◦ Built profile management system with photo upload functionality, displaying actual user data from Firestore database without any hardcoded content

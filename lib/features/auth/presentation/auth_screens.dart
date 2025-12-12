@@ -164,7 +164,7 @@ class _AuthChoiceScreenState extends ConsumerState<AuthChoiceScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Jika memilih Admin, wajib isi admin code yang valid. Karyawan terikat pada perangkat pertama saat login.',
+                        'Karyawan terikat pada perangkat pertama saat login.',
                         style: textTheme.bodySmall?.copyWith(
                           color: isDark ? Colors.white70 : AppColors.navy,
                         ),
@@ -189,8 +189,6 @@ class UnifiedSignUpScreen extends ConsumerStatefulWidget {
 }
 
 class _UnifiedSignUpScreenState extends ConsumerState<UnifiedSignUpScreen> {
-  String role = 'employee';
-  String adminCode = '';
   String name = '';
   String email = '';
   String password = '';
@@ -221,23 +219,14 @@ class _UnifiedSignUpScreenState extends ConsumerState<UnifiedSignUpScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Pilih peran dan lengkapi data', style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+            Text('Daftar Sebagai Karyawan', style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              value: role,
-              items: const [
-                DropdownMenuItem(value: 'employee', child: Text('Karyawan')),
-                DropdownMenuItem(value: 'admin', child: Text('Admin (butuh admin code)')),
-              ],
-              onChanged: (v) => setState(() => role = v ?? 'employee'),
-              decoration: const InputDecoration(labelText: 'Peran'),
-            ),
-            const SizedBox(height: 10),
-            if (role == 'admin')
-              TextField(
-                decoration: const InputDecoration(labelText: 'Admin Code'),
-                onChanged: (v) => adminCode = v,
+            Text(
+              'Catatan: Admin account dibuat langsung melalui database atau oleh admin lain.',
+              style: textTheme.bodySmall?.copyWith(
+                color: isDark ? Colors.white70 : Colors.black54,
               ),
+            ),
             const SizedBox(height: 10),
             TextField(
               decoration: const InputDecoration(labelText: 'Nama'),
@@ -278,41 +267,19 @@ class _UnifiedSignUpScreenState extends ConsumerState<UnifiedSignUpScreen> {
                         // Sign out any existing session first
                         await ref.read(authControllerProvider.notifier).signOut();
                         
-                        if (role == 'admin') {
-                          if (adminCode.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Admin code wajib diisi untuk Admin.')),
+                        final user = await ref.read(authControllerProvider.notifier).employeeSignUp(
+                              name: name.trim(),
+                              email: email.trim(),
+                              password: password,
+                              contact: contact.trim(),
                             );
-                            return;
-                          }
-                          final user = await ref.read(authControllerProvider.notifier).adminSignUp(
-                                adminCode: adminCode.trim(),
-                                name: name.trim(),
-                                email: email.trim(),
-                                password: password,
-                              );
-                          if (!mounted) return;
-                          // Invalidate user provider to refresh
-                          ref.invalidate(currentUserProvider);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Berhasil mendaftar sebagai Admin: ${user.name}')),
-                          );
-                          context.go('/dashboard/admin');
-                        } else {
-                          final user = await ref.read(authControllerProvider.notifier).employeeSignUp(
-                                name: name.trim(),
-                                email: email.trim(),
-                                password: password,
-                                contact: contact.trim(),
-                              );
-                          if (!mounted) return;
-                          // Invalidate user provider to refresh
-                          ref.invalidate(currentUserProvider);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Berhasil mendaftar sebagai Karyawan: ${user.name}')),
-                          );
-                          context.go('/dashboard/employee');
-                        }
+                        if (!mounted) return;
+                        // Invalidate user provider to refresh
+                        ref.invalidate(currentUserProvider);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Berhasil mendaftar sebagai Karyawan: ${user.name}')),
+                        );
+                        context.go('/dashboard/employee');
                       } catch (e) {
                         if (!mounted) return;
                         ScaffoldMessenger.of(context)
@@ -340,81 +307,6 @@ class _UnifiedSignUpScreenState extends ConsumerState<UnifiedSignUpScreen> {
   }
 }
 
-
-class AdminSignUpScreen extends ConsumerStatefulWidget {
-  const AdminSignUpScreen({super.key});
-
-  @override
-  ConsumerState<AdminSignUpScreen> createState() => _AdminSignUpScreenState();
-}
-
-class _AdminSignUpScreenState extends ConsumerState<AdminSignUpScreen> {
-  String adminCode = '';
-  String name = '';
-  String email = '';
-  String password = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading;
-    return Scaffold(
-      appBar: AppBar(
-        leading: context.canPop() ? const BackButton() : null,
-        title: const Text('Buat Akun Admin'),
-      ),
-      body: _AuthForm(
-        title: 'Admin Code diperlukan',
-        subtitle: 'Gunakan admin code unik yang dihasilkan sistem sebelum membuat akun.',
-        fields: [
-          _AuthField(
-            label: 'Admin Code',
-            hint: 'ADM-XXXX',
-            onChanged: (v) => setState(() => adminCode = v),
-          ),
-          _AuthField(
-            label: 'Nama',
-            hint: 'Nama lengkap',
-            onChanged: (v) => setState(() => name = v),
-          ),
-          _AuthField(
-            label: 'Email',
-            hint: 'email@perusahaan.com',
-            keyboardType: TextInputType.emailAddress,
-            onChanged: (v) => setState(() => email = v),
-          ),
-          _AuthField(
-            label: 'Password',
-            hint: 'Minimal 8 karakter',
-            obscure: true,
-            onChanged: (v) => setState(() => password = v),
-          ),
-        ],
-        primaryActionLabel: 'Daftar Admin',
-        onPrimary: () async {
-          try {
-            await ref.read(authControllerProvider.notifier).adminSignUp(
-                  adminCode: adminCode,
-                  name: name,
-                  email: email,
-                  password: password,
-                );
-            if (!mounted) return;
-            context.go('/dashboard/admin');
-          } catch (e) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(e.toString())),
-            );
-          }
-        },
-        secondaryActionLabel: 'Sudah punya akun? Masuk',
-        onSecondary: () => context.go('/auth/admin/login'),
-        isLoading: isLoading,
-      ),
-    );
-  }
-}
 
 class EmployeeSignUpScreen extends ConsumerStatefulWidget {
   const EmployeeSignUpScreen({super.key});

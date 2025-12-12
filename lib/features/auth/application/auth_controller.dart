@@ -44,7 +44,6 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<AppUser> adminSignUp({
-    required String adminCode,
     required String name,
     required String email,
     required String password,
@@ -52,7 +51,6 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncLoading();
     try {
       final user = await _repo.adminSignUp(
-        adminCode: adminCode,
         name: name,
         email: email,
         password: password,
@@ -64,6 +62,55 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
       state = AsyncError(e, StackTrace.current);
       rethrow;
     }
+  }
+
+  Future<void> updateUserRole({
+    required String userId,
+    required String newRole,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => _repo.updateUserRole(userId: userId, newRole: newRole),
+    );
+  }
+
+  Future<void> updateUserProfile({
+    required String userId,
+    String? name,
+    String? email,
+    String? contact,
+    String? role,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => _repo.updateUserProfile(
+        userId: userId,
+        name: name,
+        email: email,
+        contact: contact,
+        role: role,
+      ),
+    );
+  }
+
+  Future<void> setUserActiveStatus({
+    required String userId,
+    required bool isActive,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => _repo.setUserActiveStatus(userId: userId, isActive: isActive),
+    );
+  }
+
+  Future<void> deleteUserDoc(String userId) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _repo.deleteUserDoc(userId: userId));
+  }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _repo.sendPasswordResetEmail(email: email));
   }
 
   Future<void> employeeLogin({
