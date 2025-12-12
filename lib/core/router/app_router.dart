@@ -3,7 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/attendance/presentation/attendance_screens.dart';
+import '../../features/attendance/presentation/wifi_network_management_screen.dart';
+import '../../features/attendance/presentation/employee_attendance_detail_screen.dart';
+import '../../features/auth/presentation/add_employee_screen.dart';
 import '../../features/auth/presentation/auth_screens.dart';
+import '../../features/auth/presentation/employee_list_screen.dart';
+import '../../features/auth/presentation/user_management_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screens.dart';
 import '../../features/leave/presentation/leave_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
@@ -52,6 +57,33 @@ final appRouterProvider = Provider<GoRouter>(
       GoRoute(
         path: '/qr',
         builder: (context, state) => const QrBackupScreen(),
+      ),
+      GoRoute(
+        path: '/admin/wifi-networks',
+        builder: (context, state) => const WifiNetworkManagementScreen(),
+      ),
+      GoRoute(
+        path: '/admin/users',
+        builder: (context, state) => const UserManagementScreen(),
+      ),
+      GoRoute(
+        path: '/admin/employees',
+        builder: (context, state) => const EmployeeListScreen(),
+      ),
+      GoRoute(
+        path: '/admin/add-employee',
+        builder: (context, state) => const AddEmployeeScreen(),
+      ),
+      GoRoute(
+        path: '/admin/employee-attendance/:userId',
+        builder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          final name = state.uri.queryParameters['name'] ?? 'Karyawan';
+          return EmployeeAttendanceDetailScreen(
+            userId: userId,
+            userName: name,
+          );
+        },
       ),
     ],
   ),

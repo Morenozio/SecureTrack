@@ -14,13 +14,20 @@ class AttendanceController extends StateNotifier<AsyncValue<void>> {
 
   final AttendanceRepository _repo;
 
-  Future<void> checkIn(AppUser user, {String method = 'app'}) async {
+  Future<void> checkIn(
+    AppUser user, {
+    String method = 'wifi',
+    required String ssid,
+    required String bssid,
+  }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
       () => _repo.checkIn(
         userId: user.id,
         deviceId: user.deviceId,
         method: method,
+        ssid: ssid,
+        bssid: bssid,
       ),
     );
   }
@@ -32,4 +39,9 @@ class AttendanceController extends StateNotifier<AsyncValue<void>> {
     );
   }
 }
+
+
+
+
+
 
