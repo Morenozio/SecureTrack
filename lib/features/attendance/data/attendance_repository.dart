@@ -25,6 +25,27 @@ class AttendanceRepository {
     return _logs.orderBy('checkIn', descending: true).limit(20).snapshots();
   }
 
+  // Get today's check-ins (filter on client side to avoid composite index)
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> getTodayCheckIns() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    
+    // Get all recent logs and filter on client side to avoid composite index
+    final snapshot = await _logs
+        .orderBy('checkIn', descending: true)
+        .limit(100)
+        .get();
+    
+    // Filter on client side for today's check-ins
+    return snapshot.docs.where((doc) {
+      final checkIn = (doc.data()['checkIn'] as Timestamp?)?.toDate();
+      if (checkIn == null) return false;
+      return checkIn.isAfter(startOfDay.subtract(const Duration(seconds: 1))) &&
+          checkIn.isBefore(endOfDay);
+    }).toList();
+  }
+
   Future<void> checkIn({
     required String userId,
     required String? deviceId,

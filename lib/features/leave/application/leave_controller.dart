@@ -19,7 +19,29 @@ class LeaveController extends StateNotifier<AsyncValue<void>> {
       () => _repo.submitLeave(userId: user.id, type: type, notes: notes),
     );
   }
+
+  Future<void> approveLeave({
+    required String leaveId,
+    String? adminNotes,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => _repo.approveLeave(leaveId: leaveId, adminNotes: adminNotes),
+    );
+  }
+
+  Future<void> rejectLeave({
+    required String leaveId,
+    String? adminNotes,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => _repo.rejectLeave(leaveId: leaveId, adminNotes: adminNotes),
+    );
+  }
 }
+
+
 
 
 

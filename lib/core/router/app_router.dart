@@ -5,14 +5,17 @@ import 'package:go_router/go_router.dart';
 import '../../features/attendance/presentation/attendance_screens.dart';
 import '../../features/attendance/presentation/wifi_network_management_screen.dart';
 import '../../features/attendance/presentation/employee_attendance_detail_screen.dart';
+import '../../features/attendance/presentation/work_schedule_screen.dart';
 import '../../features/auth/presentation/add_employee_screen.dart';
 import '../../features/auth/presentation/auth_screens.dart';
 import '../../features/auth/presentation/employee_list_screen.dart';
 import '../../features/auth/presentation/user_management_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screens.dart';
 import '../../features/leave/presentation/leave_screen.dart';
+import '../../features/leave/presentation/leave_inbox_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/attendance/presentation/work_schedule_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>(
   (ref) => GoRouter(
@@ -51,6 +54,10 @@ final appRouterProvider = Provider<GoRouter>(
         builder: (context, state) => const LeaveRequestScreen(),
       ),
       GoRoute(
+        path: '/admin/leave-inbox',
+        builder: (context, state) => const LeaveInboxScreen(),
+      ),
+      GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
       ),
@@ -82,6 +89,28 @@ final appRouterProvider = Provider<GoRouter>(
           return EmployeeAttendanceDetailScreen(
             userId: userId,
             userName: name,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/admin/work-schedule/:userId',
+        builder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          final name = state.uri.queryParameters['name'] ?? 'Karyawan';
+          return WorkScheduleScreen(
+            userId: userId,
+            userName: name,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/admin/work-schedule/:userId',
+        builder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          final userName = state.uri.queryParameters['name'] ?? 'Karyawan';
+          return WorkScheduleScreen(
+            userId: userId,
+            userName: userName,
           );
         },
       ),

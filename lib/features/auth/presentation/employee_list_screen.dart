@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/app_background.dart';
 import '../../attendance/data/attendance_repository.dart';
+import '../../attendance/presentation/work_schedule_screen.dart';
 import '../../auth/data/user_providers.dart';
 
 class EmployeeListScreen extends ConsumerWidget {
@@ -217,12 +218,24 @@ class EmployeeListScreen extends ConsumerWidget {
                         onTap: () => context.push(
                           '/admin/employee-attendance/$userId?name=${Uri.encodeComponent(name)}',
                         ),
-                        trailing: IconButton(
-                          tooltip: 'Detail absensi',
-                          icon: const Icon(Icons.chevron_right),
-                          onPressed: () => context.push(
-                            '/admin/employee-attendance/$userId?name=${Uri.encodeComponent(name)}',
-                          ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Jadwal Kerja',
+                              icon: const Icon(Icons.calendar_today, size: 20),
+                              onPressed: () => context.push(
+                                '/admin/work-schedule/$userId?name=${Uri.encodeComponent(name)}',
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Detail absensi',
+                              icon: const Icon(Icons.chevron_right),
+                              onPressed: () => context.push(
+                                '/admin/employee-attendance/$userId?name=${Uri.encodeComponent(name)}',
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },

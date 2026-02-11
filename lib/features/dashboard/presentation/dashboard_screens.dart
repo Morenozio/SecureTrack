@@ -8,8 +8,10 @@ import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/app_background.dart';
 import '../../attendance/application/attendance_controller.dart';
 import '../../attendance/data/attendance_repository.dart';
+import '../../attendance/data/work_schedule_repository.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/user_providers.dart';
+import '../../leave/data/leave_repository.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -23,6 +25,8 @@ class AdminDashboardScreen extends ConsumerWidget {
     final recentLogs = attendanceRepo.streamRecentLogs();
     final employeesStream =
         ref.watch(usersCollectionProvider).where('role', isEqualTo: 'employee').snapshots();
+    final leaveRepo = ref.watch(leaveRepositoryProvider);
+    final pendingLeavesStream = leaveRepo.streamPendingLeaves();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -129,10 +133,24 @@ class AdminDashboardScreen extends ConsumerWidget {
                       icon: Icons.admin_panel_settings,
                       onTap: () => context.push('/admin/users'),
                     ),
+                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: pendingLeavesStream,
+                      builder: (context, pendingSnapshot) {
+                        final pendingCount = pendingSnapshot.data?.docs.length ?? 0;
+                        return _QuickAction(
+                          label: 'Inbox Cuti',
+                          icon: Icons.inbox,
+                          badge: pendingCount > 0 ? pendingCount : null,
+                          onTap: () => context.push('/admin/leave-inbox'),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            _TodayAttendanceSection(textTheme: textTheme, isDark: isDark),
             const SizedBox(height: 12),
             _SectionCard(
               title: 'Monitoring Absensi Terbaru',
@@ -411,6 +429,290 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+class _TodayAttendanceSection extends ConsumerWidget {
+  const _TodayAttendanceSection({
+    required this.textTheme,
+    required this.isDark,
+  });
+
+  final TextTheme textTheme;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final attendanceRepo = ref.watch(attendanceRepositoryProvider);
+    final employeesStream = ref.watch(usersCollectionProvider)
+        .where('role', isEqualTo: 'employee')
+        .snapshots();
+
+    return _SectionCard(
+      title: 'Absensi Hari Ini',
+      children: [
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: employeesStream,
+          builder: (context, employeesSnapshot) {
+            if (employeesSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final employees = employeesSnapshot.data?.docs ?? [];
+            if (employees.isEmpty) {
+              return const ListTile(
+                title: Text('Belum ada karyawan'),
+              );
+            }
+
+            return FutureBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+              future: attendanceRepo.getTodayCheckIns(),
+              builder: (context, checkInsSnapshot) {
+                if (checkInsSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (checkInsSnapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red, size: 48),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Error: ${checkInsSnapshot.error}',
+                            style: textTheme.bodyMedium?.copyWith(color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final todayCheckIns = checkInsSnapshot.data ?? [];
+                final checkedInUserIds = <String>{};
+                for (final doc in todayCheckIns) {
+                  try {
+                    final userId = doc.data()['userId'] as String?;
+                    if (userId != null) {
+                      checkedInUserIds.add(userId);
+                    }
+                  } catch (e) {
+                    // Skip invalid documents
+                    continue;
+                  }
+                }
+
+                // Get checked in employees
+                final checkedInEmployees = employees.where((emp) {
+                  final empId = emp.id;
+                  return checkedInUserIds.contains(empId);
+                }).toList();
+
+                // Get absent employees (those who should work today but didn't check in)
+                final absentEmployees = employees.where((emp) {
+                  final empId = emp.id;
+                  return !checkedInUserIds.contains(empId);
+                }).toList();
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Summary
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Card(
+                            color: Colors.green.withOpacity(0.1),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.green, size: 32),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${checkedInEmployees.length}',
+                                    style: textTheme.headlineMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Sudah Check-in',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: isDark ? Colors.white70 : Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Card(
+                            color: Colors.red.withOpacity(0.1),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                children: [
+                                  const Icon(Icons.person_off, color: Colors.red, size: 32),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${absentEmployees.length}',
+                                    style: textTheme.headlineMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Belum Check-in',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: isDark ? Colors.white70 : Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Checked in list
+                    if (checkedInEmployees.isNotEmpty) ...[
+                      Text(
+                        'Sudah Check-in (${checkedInEmployees.length})',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : null,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...checkedInEmployees.map((emp) {
+                        final empData = emp.data();
+                        final empName = empData['name'] ?? emp.id;
+                        DateTime? checkInTime;
+                        try {
+                          if (todayCheckIns.isNotEmpty) {
+                            final matchingDocs = todayCheckIns.where((doc) {
+                              try {
+                                return doc.data()['userId'] == emp.id;
+                              } catch (e) {
+                                return false;
+                              }
+                            }).toList();
+                            
+                            if (matchingDocs.isNotEmpty) {
+                              final checkInDoc = matchingDocs.first;
+                              checkInTime = (checkInDoc.data()['checkIn'] as Timestamp?)?.toDate();
+                            }
+                          }
+                        } catch (e) {
+                          checkInTime = null;
+                        }
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          color: Colors.green.withOpacity(0.05),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.green.withOpacity(0.2),
+                              child: const Icon(Icons.check_circle, color: Colors.green),
+                            ),
+                            title: Text(
+                              empName.toString(),
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: checkInTime != null
+                                ? Text(
+                                    'Check-in: ${checkInTime.toString().split(' ')[1].substring(0, 5)}',
+                                  )
+                                : const Text('Check-in: -'),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.schedule),
+                              tooltip: 'Lihat Detail',
+                              onPressed: () => context.push(
+                                '/admin/employee-attendance/${emp.id}?name=${Uri.encodeComponent(empName.toString())}',
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                    ],
+                    // Absent list
+                    if (absentEmployees.isNotEmpty) ...[
+                      Text(
+                        'Belum Check-in (${absentEmployees.length})',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : null,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...absentEmployees.take(10).map((emp) {
+                        final empData = emp.data();
+                        final empName = empData['name'] ?? emp.id;
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          color: Colors.red.withOpacity(0.05),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.red.withOpacity(0.2),
+                              child: const Icon(Icons.person_off, color: Colors.red),
+                            ),
+                            title: Text(
+                              empName.toString(),
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: const Text('Belum check-in hari ini'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.calendar_today, size: 20),
+                                  tooltip: 'Atur Jadwal',
+                                  onPressed: () => context.push(
+                                    '/admin/work-schedule/${emp.id}?name=${Uri.encodeComponent(empName.toString())}',
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.schedule, size: 20),
+                                  tooltip: 'Lihat Riwayat',
+                                  onPressed: () => context.push(
+                                    '/admin/employee-attendance/${emp.id}?name=${Uri.encodeComponent(empName.toString())}',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                      if (absentEmployees.length > 10)
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            '... dan ${absentEmployees.length - 10} lainnya',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: isDark ? Colors.white60 : Colors.black54,
+                            ),
+                          ),
+                        ),
+                    ],
+                    if (checkedInEmployees.isEmpty && absentEmployees.isEmpty)
+                      const ListTile(
+                        title: Text('Tidak ada data absensi hari ini'),
+                      ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.title, required this.children});
 
@@ -446,21 +748,121 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
+class _AttendanceStatCard extends StatelessWidget {
+  const _AttendanceStatCard({
+    required this.title,
+    required this.count,
+    required this.total,
+    required this.color,
+    required this.icon,
+  });
+
+  final String title;
+  final int count;
+  final int total;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final percentage = total > 0 ? (count / total * 100).toStringAsFixed(0) : '0';
+
+    return Card(
+      color: color.withOpacity(0.1),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 24),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$count / $total',
+              style: textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            Text(
+              '$percentage%',
+              style: textTheme.bodySmall?.copyWith(
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _QuickAction extends StatelessWidget {
-  const _QuickAction({required this.label, required this.icon, required this.onTap});
+  const _QuickAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.badge,
+  });
 
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final int? badge;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: 160,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18),
-        label: Text(label, textAlign: TextAlign.center),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          OutlinedButton.icon(
+            onPressed: onTap,
+            icon: Icon(icon, size: 18),
+            label: Text(label, textAlign: TextAlign.center),
+          ),
+          if (badge != null && badge! > 0)
+            Positioned(
+              top: -8,
+              right: -8,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 20,
+                  minHeight: 20,
+                ),
+                child: Text(
+                  badge! > 99 ? '99+' : badge.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

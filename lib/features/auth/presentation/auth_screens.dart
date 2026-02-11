@@ -17,6 +17,7 @@ class AuthChoiceScreen extends ConsumerStatefulWidget {
 class _AuthChoiceScreenState extends ConsumerState<AuthChoiceScreen> {
   String email = '';
   String password = '';
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +105,7 @@ class _AuthChoiceScreenState extends ConsumerState<AuthChoiceScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Masuk dengan email & password. Sistem otomatis mengenali Admin atau Karyawan berdasarkan data di database.',
+                        'Masuk dengan email & password',
                         style: textTheme.bodyMedium?.copyWith(
                           color: isDark ? Colors.white70 : Colors.black87,
                         ),
@@ -117,8 +118,20 @@ class _AuthChoiceScreenState extends ConsumerState<AuthChoiceScreen> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
-                        decoration: const InputDecoration(labelText: 'Password'),
-                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: _obscurePassword,
                         onChanged: (v) => setState(() => password = v),
                       ),
                       const SizedBox(height: 16),
@@ -161,13 +174,6 @@ class _AuthChoiceScreenState extends ConsumerState<AuthChoiceScreen> {
                       OutlinedButton(
                         onPressed: () => context.push('/auth/signup'),
                         child: const Text('Daftar'),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Karyawan terikat pada perangkat pertama saat login.',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: isDark ? Colors.white70 : AppColors.navy,
-                        ),
                       ),
                     ],
                   ),
@@ -458,7 +464,7 @@ class _AuthField {
     this.keyboardType,
     this.onChanged,
   });
-
+  
   final String label;
   final String hint;
   final bool obscure;

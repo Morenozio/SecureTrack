@@ -1,30 +1,86 @@
 # SecureTrack
 
-<<<<<<< HEAD
-Attendance app currently in development
-=======
-Developed a secure employee attendance management system with multi-layered validation and real-time monitoring capabilities
->>>>>>> release
+A secure employee attendance management system built with Flutter, featuring multi-layered validation and real-time monitoring capabilities.
 
-◦ Implemented unified authentication system that automatically detects user roles (Admin/Employee) after login and validates admin registration with unique admin codes
+## About
 
-<<<<<<< HEAD
-SecureTrack is a Flutter-based Android attendance
-app using Riverpod, GoRouter, and Firebase,
-featuring secure attendance with WiFi IP and GPS
-validation.
-=======
-◦ Built real-time attendance tracking with WiFi IP validation, GPS location verification, and QR code backup method for emergency situations
+SecureTrack is a Flutter-based Android attendance app that provides a complete solution for workplace attendance management. It uses Riverpod for state management, GoRouter for navigation, and Firebase as the backend.
 
-◦ Designed secure device binding system that links each employee account to a single device ID to prevent unauthorized access from other devices
+## Features
 
-◦ Created comprehensive admin dashboard with live attendance monitoring, employee management (add/edit/delete), and real-time data visualization from Firebase
+### Authentication & Security
+- **Unified login system** that automatically detects user roles (Admin/Employee)
+- **Admin registration** protected with unique admin codes
+- **Device binding** — each employee account is linked to a single device ID to prevent unauthorized access
 
-◦ Developed dual-role interface with separate dashboards for admins (monitoring, reporting, employee management) and employees (check-in/out, leave requests, attendance history)
+### Attendance Tracking
+- **WiFi IP validation** to verify employees are on the company network
+- **GPS location verification** to confirm physical presence at the workplace
+- **QR code backup** method for emergency check-in situations
 
-◦ Integrated Firebase backend (Auth, Firestore, Storage) with MVVM architecture using Riverpod for state management and GoRouter for navigation
+### Admin Dashboard
+- Live attendance monitoring
+- Employee management (add/edit/delete)
+- Real-time data visualization from Firebase
 
-◦ Implemented dark mode and light mode themes with navy blue and white color scheme, allowing users to toggle between themes with persistent preferences
+### Employee Dashboard
+- Check-in and check-out
+- Leave requests
+- Attendance history
 
-◦ Built profile management system with photo upload functionality, displaying actual user data from Firestore database without any hardcoded content
->>>>>>> release
+### Additional Features
+- **Profile management** with photo upload, displaying real user data from Firestore
+- **Dark mode & light mode** with a navy blue and white color scheme and persistent theme preferences
+
+## Tech Stack
+
+| Layer              | Technology                        |
+| ------------------ | --------------------------------- |
+| Framework          | Flutter                           |
+| Language           | Dart                              |
+| State Management   | Riverpod                          |
+| Navigation         | GoRouter                          |
+| Backend            | Firebase (Auth, Firestore, Storage) |
+| Architecture       | MVVM                              |
+
+## Project Structure
+
+```
+lib/
+├── main.dart
+├── app.dart
+├── firebase_options.dart
+├── core/
+│   ├── constants/
+│   ├── firebase/
+│   ├── router/
+│   ├── theme/
+│   └── widgets/
+└── features/
+    ├── auth/          # Login, registration, role detection
+    ├── attendance/    # Check-in/out with WiFi + GPS validation
+    ├── dashboard/     # Admin & employee dashboards
+    ├── leave/         # Leave request system
+    ├── profile/       # User profile management
+    └── splash/        # Splash screen
+```
+
+## Getting Started
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   ```
+
+2. **Install dependencies**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Configure Firebase**
+   - Set up a Firebase project and add your `google-services.json` (Android) or `GoogleService-Info.plist` (iOS)
+
+4. **Run the app**
+   ```bash
+   flutter run
+   ```
