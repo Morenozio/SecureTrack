@@ -21,6 +21,8 @@ class _AddEmployeeScreenState extends ConsumerState<AddEmployeeScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _contactController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _positionController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -29,6 +31,8 @@ class _AddEmployeeScreenState extends ConsumerState<AddEmployeeScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _contactController.dispose();
+    _departmentController.dispose();
+    _positionController.dispose();
     super.dispose();
   }
 
@@ -40,7 +44,9 @@ class _AddEmployeeScreenState extends ConsumerState<AddEmployeeScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await ref.read(authControllerProvider.notifier).employeeSignUp(
+      await ref
+          .read(authControllerProvider.notifier)
+          .employeeSignUp(
             name: _nameController.text.trim(),
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
@@ -79,10 +85,7 @@ class _AddEmployeeScreenState extends ConsumerState<AddEmployeeScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -182,6 +185,26 @@ class _AddEmployeeScreenState extends ConsumerState<AddEmployeeScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  controller: _departmentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Department',
+                    hintText: 'e.g. Engineering, Marketing',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.business),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _positionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Position',
+                    hintText: 'e.g. Software Engineer, Manager',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.work),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
                   controller: _contactController,
                   decoration: const InputDecoration(
                     labelText: 'Kontak (Opsional)',
@@ -204,7 +227,9 @@ class _AddEmployeeScreenState extends ConsumerState<AddEmployeeScreen> {
                           ),
                         )
                       : const Icon(Icons.person_add),
-                  label: Text(_isLoading ? 'Menambahkan...' : 'Tambah Karyawan'),
+                  label: Text(
+                    _isLoading ? 'Menambahkan...' : 'Tambah Karyawan',
+                  ),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
@@ -217,6 +242,3 @@ class _AddEmployeeScreenState extends ConsumerState<AddEmployeeScreen> {
     );
   }
 }
-
-
-

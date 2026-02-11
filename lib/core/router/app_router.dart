@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/attendance/presentation/attendance_screens.dart';
+import '../../features/attendance/presentation/attendance_management_screen.dart';
 import '../../features/attendance/presentation/wifi_network_management_screen.dart';
 import '../../features/attendance/presentation/employee_attendance_detail_screen.dart';
 import '../../features/attendance/presentation/work_schedule_screen.dart';
@@ -14,107 +15,158 @@ import '../../features/dashboard/presentation/dashboard_screens.dart';
 import '../../features/leave/presentation/leave_screen.dart';
 import '../../features/leave/presentation/leave_inbox_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
-import '../../features/attendance/presentation/work_schedule_screen.dart';
+
+// ─── Shared transition builder ───────────────────────────
+CustomTransitionPage<void> _transitionPage({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: Tween<double>(begin: 0.0, end: 1.0).animate(curved),
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.04, 0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
 final appRouterProvider = Provider<GoRouter>(
   (ref) => GoRouter(
     initialLocation: '/',
     routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const SplashScreen(),
-      ),
+      // Splash — no transition (instant)
+      GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(
         path: '/auth',
-        builder: (context, state) => const AuthChoiceScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const AuthChoiceScreen()),
       ),
       GoRoute(
         path: '/auth/signup',
-        builder: (context, state) => const UnifiedSignUpScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const UnifiedSignUpScreen()),
       ),
       GoRoute(
         path: '/dashboard/admin',
-        builder: (context, state) => const AdminDashboardScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const AdminDashboardScreen()),
       ),
       GoRoute(
         path: '/dashboard/employee',
-        builder: (context, state) => const EmployeeDashboardScreen(),
+        pageBuilder: (context, state) => _transitionPage(
+          state: state,
+          child: const EmployeeDashboardScreen(),
+        ),
       ),
       GoRoute(
         path: '/attendance',
-        builder: (context, state) => const AttendanceScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const AttendanceScreen()),
       ),
       GoRoute(
         path: '/attendance/history',
-        builder: (context, state) => const AttendanceHistoryScreen(),
+        pageBuilder: (context, state) => _transitionPage(
+          state: state,
+          child: const AttendanceHistoryScreen(),
+        ),
       ),
       GoRoute(
         path: '/leave',
-        builder: (context, state) => const LeaveRequestScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const LeaveRequestScreen()),
       ),
       GoRoute(
         path: '/admin/leave-inbox',
-        builder: (context, state) => const LeaveInboxScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const LeaveInboxScreen()),
       ),
       GoRoute(
         path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const ProfileScreen()),
       ),
       GoRoute(
         path: '/qr',
-        builder: (context, state) => const QrBackupScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const QrBackupScreen()),
       ),
       GoRoute(
         path: '/admin/wifi-networks',
-        builder: (context, state) => const WifiNetworkManagementScreen(),
+        pageBuilder: (context, state) => _transitionPage(
+          state: state,
+          child: const WifiNetworkManagementScreen(),
+        ),
       ),
       GoRoute(
         path: '/admin/users',
-        builder: (context, state) => const UserManagementScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const UserManagementScreen()),
       ),
       GoRoute(
         path: '/admin/employees',
-        builder: (context, state) => const EmployeeListScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const EmployeeListScreen()),
       ),
       GoRoute(
         path: '/admin/add-employee',
-        builder: (context, state) => const AddEmployeeScreen(),
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const AddEmployeeScreen()),
+      ),
+      GoRoute(
+        path: '/admin/attendance-management',
+        pageBuilder: (context, state) => _transitionPage(
+          state: state,
+          child: const AttendanceManagementScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/settings',
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const SettingsScreen()),
       ),
       GoRoute(
         path: '/admin/employee-attendance/:userId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final userId = state.pathParameters['userId']!;
           final name = state.uri.queryParameters['name'] ?? 'Karyawan';
-          return EmployeeAttendanceDetailScreen(
-            userId: userId,
-            userName: name,
+          return _transitionPage(
+            state: state,
+            child: EmployeeAttendanceDetailScreen(
+              userId: userId,
+              userName: name,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/admin/work-schedule/:userId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final userId = state.pathParameters['userId']!;
           final name = state.uri.queryParameters['name'] ?? 'Karyawan';
-          return WorkScheduleScreen(
-            userId: userId,
-            userName: name,
-          );
-        },
-      ),
-      GoRoute(
-        path: '/admin/work-schedule/:userId',
-        builder: (context, state) {
-          final userId = state.pathParameters['userId']!;
-          final userName = state.uri.queryParameters['name'] ?? 'Karyawan';
-          return WorkScheduleScreen(
-            userId: userId,
-            userName: userName,
+          return _transitionPage(
+            state: state,
+            child: WorkScheduleScreen(userId: userId, userName: name),
           );
         },
       ),
     ],
   ),
 );
-

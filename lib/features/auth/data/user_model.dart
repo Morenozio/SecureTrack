@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class AppUser {
   AppUser({
     required this.id,
@@ -9,17 +11,25 @@ class AppUser {
     this.locationId,
     this.departmentId,
     this.photoUrl,
+    this.position,
+    this.department,
+    this.isActive = true,
+    this.createdAt,
   });
 
   final String id;
   final String name;
   final String email;
-  final String role; // 'admin' atau 'employee'
+  final String role; // 'admin' or 'employee'
   final String? contact;
   final String? deviceId;
   final String? locationId;
   final String? departmentId;
   final String? photoUrl;
+  final String? position;
+  final String? department;
+  final bool isActive;
+  final DateTime? createdAt;
 
   factory AppUser.fromMap(String id, Map<String, dynamic> data) {
     return AppUser(
@@ -32,6 +42,10 @@ class AppUser {
       locationId: data['locationId'] as String?,
       departmentId: data['departmentId'] as String?,
       photoUrl: data['photoUrl'] as String?,
+      position: data['position'] as String?,
+      department: data['department'] as String?,
+      isActive: (data['isActive'] as bool?) ?? true,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -45,7 +59,12 @@ class AppUser {
       'locationId': locationId,
       'departmentId': departmentId,
       'photoUrl': photoUrl,
+      'position': position,
+      'department': department,
+      'isActive': isActive,
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
     };
   }
 }
-
