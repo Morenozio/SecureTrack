@@ -12,6 +12,7 @@ import '../../../core/services/wifi_service.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../attendance/application/attendance_controller.dart';
 import '../../attendance/data/attendance_repository.dart';
+import '../../attendance/data/wifi_network_repository.dart';
 import '../../auth/data/user_providers.dart';
 import '../../leave/data/leave_repository.dart';
 
@@ -576,9 +577,16 @@ class _EmployeeDashboardScreenState
   late final Animation<double> _fadeAnim;
   late final Animation<Offset> _slideAnim;
 
-  // New state variables
+  // WiFi state
   WifiInfo? _wifiInfo;
   bool _isWifiLoading = false;
+  bool?
+  _isWifiVerified; // null = not checked, true = office WiFi, false = wrong WiFi
+
+  // Cached streams — MUST NOT be recreated on every build()
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _activeSessionStream;
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _historyStream;
+  String? _cachedUserId;
 
   @override
   void initState() {
@@ -597,8 +605,6 @@ class _EmployeeDashboardScreenState
     ).animate(_fadeAnim);
     _staggerCtrl.forward();
 
-    _staggerCtrl.forward();
-
     // Initial WiFi check
     _checkWifi();
   }
@@ -609,17 +615,115 @@ class _EmployeeDashboardScreenState
     super.dispose();
   }
 
+  /// Ensures streams are created only once per user ID.
+  void _ensureStreams(String userId) {
+    if (_cachedUserId == userId && _activeSessionStream != null) return;
+    _cachedUserId = userId;
+    final repo = ref.read(attendanceRepositoryProvider);
+    _activeSessionStream = repo.streamActiveSession(userId);
+    _historyStream = repo.streamUserLogs(userId);
+  }
+
   Future<void> _checkWifi() async {
     if (_isWifiLoading) return;
     setState(() => _isWifiLoading = true);
     try {
       final info = await ref.read(wifiServiceProvider).getWifiInfo();
-      if (mounted) setState(() => _wifiInfo = info);
+      if (!mounted) return;
+      setState(() => _wifiInfo = info);
+
+      // Verify against admin-registered networks
+      if (info.isComplete) {
+        final wifiRepo = ref.read(wifiNetworkRepositoryProvider);
+        final verified = await wifiRepo.verifyWifiNetwork(
+          ssid: info.ssid!,
+          bssid: info.bssid!,
+        );
+        if (mounted) setState(() => _isWifiVerified = verified);
+      } else {
+        if (mounted) setState(() => _isWifiVerified = null);
+      }
     } catch (e) {
-      if (mounted) setState(() => _wifiInfo = null);
+      if (mounted) {
+        setState(() {
+          _wifiInfo = null;
+          _isWifiVerified = null;
+        });
+      }
     } finally {
       if (mounted) setState(() => _isWifiLoading = false);
     }
+  }
+
+  Widget _buildWifiStatusChip() {
+    // 3 states: verified (green), wrong network (red), no wifi (yellow)
+    final Color chipColor;
+    final IconData chipIcon;
+    final String chipText;
+
+    if (_wifiInfo?.ssid != null && _isWifiVerified == true) {
+      // Office WiFi - verified ✅
+      chipColor = AppColors.success;
+      chipIcon = Icons.wifi;
+      chipText = '✓ Office WiFi: ${_wifiInfo!.ssid}';
+    } else if (_wifiInfo?.ssid != null && _isWifiVerified == false) {
+      // Wrong WiFi - not registered ❌
+      chipColor = AppColors.danger;
+      chipIcon = Icons.wifi_lock;
+      chipText = '✗ Wrong WiFi: ${_wifiInfo!.ssid}';
+    } else {
+      // No WiFi detected
+      chipColor = AppColors.warning;
+      chipIcon = Icons.wifi_off;
+      chipText = 'WiFi Not Detected';
+    }
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: chipColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: chipColor.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(chipIcon, size: 16, color: chipColor),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                chipText,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: chipColor,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: _checkWifi,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: _isWifiLoading
+                    ? SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: chipColor,
+                        ),
+                      )
+                    : Icon(Icons.refresh, size: 14, color: chipColor),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -627,594 +731,556 @@ class _EmployeeDashboardScreenState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final userAsync = ref.watch(currentUserProvider);
     final user = userAsync.valueOrNull;
-    final attendanceRepo = ref.watch(attendanceRepositoryProvider);
-    final Stream<QuerySnapshot<Map<String, dynamic>>> logsStream = user == null
-        ? Stream<QuerySnapshot<Map<String, dynamic>>>.empty()
-        : attendanceRepo.streamUserLogs(user.id);
+    if (user == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // Cache streams so they survive rebuilds
+    _ensureStreams(user.id);
 
     // Determine greeting
     final hour = DateTime.now().hour;
-    String greeting = 'Good Morning';
-    if (hour >= 12 && hour < 17) greeting = 'Good Afternoon';
-    if (hour >= 17) greeting = 'Good Evening';
+    final greeting = hour < 12
+        ? 'Good Morning'
+        : hour < 17
+        ? 'Good Afternoon'
+        : 'Good Evening';
 
     return Scaffold(
       backgroundColor: isDark
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ─── Header ───
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.backgroundDark
-                    : AppColors.backgroundLight,
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark
-                        ? AppColors.primary.withOpacity(0.1)
-                        : Colors.grey.shade200,
-                  ),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            expandedHeight: 180,
+            floating: false,
+            pinned: true,
+            automaticallyImplyLeading: false,
+            backgroundColor: isDark
+                ? AppColors.backgroundDark
+                : AppColors.backgroundLight,
+            elevation: 0,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                padding: const EdgeInsets.only(top: 60, left: 24, right: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.person_outline,
+                            color: AppColors.primary,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              greeting,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade500,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              user.name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.cardDark : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark
+                              ? AppColors.primary.withOpacity(0.1)
+                              : Colors.grey.shade200,
+                        ),
+                      ),
+                      child: const Icon(Icons.notifications_none, size: 20),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
+            ),
+          ),
+        ],
+        body: FadeTransition(
+          opacity: _fadeAnim,
+          child: SlideTransition(
+            position: _slideAnim,
+            child: SingleChildScrollView(
+              child: Column(
                 children: [
-                  // Profile avatar
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.primary.withOpacity(0.3),
-                        width: 2,
-                      ),
-                      color: AppColors.primary.withOpacity(0.1),
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
+                  // WiFi Status Chip
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildWifiStatusChip(),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
+
+                  // Warning banner when wrong WiFi
+                  if (_isWifiVerified == false && _wifiInfo?.ssid != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.danger.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: AppColors.danger,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'WiFi "${_wifiInfo!.ssid}" tidak terdaftar. '
+                                'Anda tidak bisa check-in dengan jaringan ini. '
+                                'Hubungkan ke WiFi kantor.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.danger,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 24),
+
+                  // Timer & Action Section (Reactive)
+                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: _activeSessionStream,
+                    builder: (context, snapshot) {
+                      DateTime? todayCheckIn;
+                      bool isCheckedIn = false;
+
+                      if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                        final data = snapshot.data!.docs.first.data();
+                        final checkInRaw = data['checkIn'];
+                        final checkIn = checkInRaw is Timestamp
+                            ? checkInRaw.toDate()
+                            : null;
+
+                        isCheckedIn = true;
+                        todayCheckIn = checkIn ?? DateTime.now();
+                      }
+
+                      return Column(
+                        children: [
+                          if (isCheckedIn)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppColors.success.withOpacity(0.5),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.success,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'CHECKED IN',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.success,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          const SizedBox(height: 16),
+                          _LiveWorkTimer(
+                            checkInTime: todayCheckIn,
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 32),
+
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Consumer(
+                              builder: (context, watchRef, _) {
+                                final attState = watchRef.watch(
+                                  attendanceControllerProvider,
+                                );
+                                final isLoading = attState is AsyncLoading;
+
+                                return SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: isLoading
+                                        ? null
+                                        : () async {
+                                            final controller = ref.read(
+                                              attendanceControllerProvider
+                                                  .notifier,
+                                            );
+                                            try {
+                                              if (isCheckedIn) {
+                                                await controller.checkOut(user);
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Check-out successful!',
+                                                      ),
+                                                      backgroundColor:
+                                                          AppColors.success,
+                                                    ),
+                                                  );
+                                                }
+                                              } else {
+                                                await controller.checkIn(user);
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Check-in successful!',
+                                                      ),
+                                                      backgroundColor:
+                                                          AppColors.success,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            } catch (e) {
+                                              if (context.mounted) {
+                                                final errorMsg =
+                                                    e.toString().contains(
+                                                      'Exception:',
+                                                    )
+                                                    ? e
+                                                          .toString()
+                                                          .split('Exception:')
+                                                          .last
+                                                          .trim()
+                                                    : e.toString();
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(errorMsg),
+                                                    backgroundColor:
+                                                        AppColors.danger,
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isCheckedIn
+                                          ? AppColors.danger
+                                          : AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 18,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    child: isLoading
+                                        ? const SizedBox(
+                                            height: 24,
+                                            width: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                isCheckedIn
+                                                    ? Icons.logout
+                                                    : Icons.login,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Text(
+                                                isCheckedIn
+                                                    ? 'Check Out'
+                                                    : 'Check In',
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Timeline Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '$greeting,',
+                          "TODAY'S TIMELINE",
                           style: TextStyle(
                             fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
                             color: isDark
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade500,
-                            fontWeight: FontWeight.w500,
+                                ? Colors.white70
+                                : Colors.grey.shade700,
                           ),
                         ),
-                        userAsync.when(
-                          data: (u) => Text(
-                            u?.name ?? 'Employee',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        const SizedBox(height: 12),
+                        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                          stream: _historyStream,
+                          builder: (context, snapshot) {
+                            String punchIn = '--:--';
+                            if (snapshot.hasData &&
+                                snapshot.data!.docs.isNotEmpty) {
+                              final today = DateTime.now();
+                              for (final doc in snapshot.data!.docs) {
+                                final checkIn =
+                                    (doc.data()['checkIn'] as Timestamp?)
+                                        ?.toDate();
+                                if (checkIn != null &&
+                                    checkIn.day == today.day &&
+                                    checkIn.month == today.month &&
+                                    checkIn.year == today.year) {
+                                  punchIn = DateFormat(
+                                    'hh:mm a',
+                                  ).format(checkIn);
+                                  break;
+                                }
+                              }
+                            }
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: _TimelineCard(
+                                    icon: Icons.login,
+                                    label: 'Punch In',
+                                    value: punchIn,
+                                    isDark: isDark,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _TimelineCard(
+                                    icon: Icons.coffee,
+                                    label: 'Break Time',
+                                    value: '00:00:00',
+                                    isDark: isDark,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Summary Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'MONTHLY SUMMARY',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                            color: isDark
+                                ? Colors.white70
+                                : Colors.grey.shade700,
                           ),
-                          loading: () => const Text(
-                            'Loading...',
-                            style: TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(height: 12),
+                        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                          stream: _historyStream,
+                          builder: (context, snapshot) {
+                            int present = 0;
+                            if (snapshot.hasData) {
+                              final now = DateTime.now();
+                              present = snapshot.data!.docs.where((doc) {
+                                final tc = (doc.data()['checkIn'] as Timestamp?)
+                                    ?.toDate();
+                                return tc != null &&
+                                    tc.month == now.month &&
+                                    tc.year == now.year;
+                              }).length;
+                            }
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: _SummaryCard(
+                                    value: '$present',
+                                    label: 'Present',
+                                    valueColor: AppColors.primary,
+                                    isDark: isDark,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _SummaryCard(
+                                    value: '0',
+                                    label: 'Absent',
+                                    valueColor: AppColors.danger,
+                                    isDark: isDark,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _SummaryCard(
+                                    value: '0',
+                                    label: 'Leaves',
+                                    valueColor: AppColors.success,
+                                    isDark: isDark,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Actions
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _EmployeeActionButton(
+                            icon: Icons.event_busy,
+                            label: 'Leave Request',
+                            isDark: isDark,
+                            onTap: () => context.push('/leave'),
                           ),
-                          error: (_, __) => const Text(
-                            'Employee',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _EmployeeActionButton(
+                            icon: Icons.history,
+                            label: 'Work History',
+                            isDark: isDark,
+                            onTap: () => context.push('/attendance/history'),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  _NavBarIcon(
-                    icon: Icons.notifications_outlined,
-                    isDark: isDark,
-                    onTap: () {},
-                  ),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
-
-            // ─── Content ───
-            Expanded(
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: SlideTransition(
-                  position: _slideAnim,
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                    children: [
-                      // WiFi Status Chip (Dynamic)
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _wifiInfo?.ssid != null
-                                ? AppColors.success.withOpacity(0.1)
-                                : AppColors.warning.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(9999),
-                            border: Border.all(
-                              color: _wifiInfo?.ssid != null
-                                  ? AppColors.success.withOpacity(0.2)
-                                  : AppColors.warning.withOpacity(0.2),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _wifiInfo?.ssid != null
-                                    ? Icons.wifi
-                                    : Icons.wifi_off,
-                                size: 14,
-                                color: _wifiInfo?.ssid != null
-                                    ? AppColors.success
-                                    : AppColors.warning,
-                              ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  _wifiInfo?.ssid != null
-                                      ? 'Connected: ${_wifiInfo!.ssid}'
-                                      : 'WiFi Not Detected',
-                                  style: TextStyle(
-                                    color: _wifiInfo?.ssid != null
-                                        ? AppColors.success
-                                        : AppColors.warning,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Refresh Button
-                              InkWell(
-                                onTap: _checkWifi,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(4.0),
-                                  child: _isWifiLoading
-                                      ? const SizedBox(
-                                          width: 12,
-                                          height: 12,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : Icon(
-                                          Icons.refresh,
-                                          size: 14,
-                                          color: _wifiInfo?.ssid != null
-                                              ? AppColors.success
-                                              : AppColors.warning,
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Timer & Action Section
-                      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: logsStream,
-                        builder: (context, snapshot) {
-                          DateTime? todayCheckIn;
-                          bool isCheckedIn = false;
-
-                          if (snapshot.hasData &&
-                              snapshot.data!.docs.isNotEmpty) {
-                            final today = DateTime.now();
-                            for (final doc in snapshot.data!.docs) {
-                              final data = doc.data();
-                              final checkIn = (data['checkIn'] as Timestamp?)
-                                  ?.toDate();
-                              if (checkIn != null &&
-                                  checkIn.year == today.year &&
-                                  checkIn.month == today.month &&
-                                  checkIn.day == today.day) {
-                                todayCheckIn = checkIn;
-                                isCheckedIn = data['checkOut'] == null;
-                                break;
-                              }
-                            }
-                          }
-                          return Column(
-                            children: [
-                              // Timer display
-                              _LiveWorkTimer(
-                                checkInTime: todayCheckIn,
-                                isDark: isDark,
-                              ),
-
-                              const SizedBox(height: 32),
-
-                              // Check In / Check Out button (inline — no navigation)
-                              SizedBox(
-                                width: double.infinity,
-                                child: Consumer(
-                                  builder: (context, watchRef, _) {
-                                    final attState = watchRef.watch(
-                                      attendanceControllerProvider,
-                                    );
-                                    final isLoading = attState is AsyncLoading;
-                                    return ElevatedButton(
-                                      onPressed: (user == null || isLoading)
-                                          ? null
-                                          : () async {
-                                              final controller = ref.read(
-                                                attendanceControllerProvider
-                                                    .notifier,
-                                              );
-                                              try {
-                                                if (isCheckedIn) {
-                                                  await controller.checkOut(
-                                                    user,
-                                                  );
-                                                  if (context.mounted) {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Check-out successful!',
-                                                        ),
-                                                        backgroundColor:
-                                                            Colors.green,
-                                                      ),
-                                                    );
-                                                  }
-                                                } else {
-                                                  await controller.checkIn(
-                                                    user,
-                                                    ssid:
-                                                        _wifiInfo?.ssid ??
-                                                        'manual',
-                                                    bssid:
-                                                        _wifiInfo?.bssid ??
-                                                        'manual',
-                                                  );
-                                                  if (context.mounted) {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Check-in successful!',
-                                                        ),
-                                                        backgroundColor:
-                                                            Colors.green,
-                                                      ),
-                                                    );
-                                                  }
-                                                }
-                                              } catch (e) {
-                                                if (context.mounted) {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        'Error: $e',
-                                                      ),
-                                                      backgroundColor:
-                                                          Colors.red,
-                                                    ),
-                                                  );
-                                                }
-                                              }
-                                            },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: isCheckedIn
-                                            ? AppColors.danger
-                                            : AppColors.primary,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 20,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        elevation: 4,
-                                        shadowColor: AppColors.primary
-                                            .withOpacity(0.3),
-                                      ),
-                                      child: isLoading
-                                          ? const SizedBox(
-                                              width: 24,
-                                              height: 24,
-                                              child: CircularProgressIndicator(
-                                                color: Colors.white,
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  isCheckedIn
-                                                      ? Icons.logout
-                                                      : Icons.login,
-                                                  size: 24,
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Text(
-                                                  isCheckedIn
-                                                      ? 'Check Out'
-                                                      : 'Check In',
-                                                  style: const TextStyle(
-                                                    fontSize: 20,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                    );
-                                  },
-                                ),
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              if (todayCheckIn != null)
-                                Text(
-                                  'Shift started at ${DateFormat('hh:mm a').format(todayCheckIn)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark
-                                        ? Colors.grey.shade400
-                                        : Colors.grey.shade500,
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 28),
-
-                      // Today's Timeline
-                      Text(
-                        "TODAY'S TIMELINE",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
-                          color: isDark ? Colors.white : Colors.grey.shade900,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: logsStream,
-                        builder: (context, snapshot) {
-                          String punchInTime = '--:--';
-                          String breakTime = '00:00:00';
-
-                          if (snapshot.hasData &&
-                              snapshot.data!.docs.isNotEmpty) {
-                            final today = DateTime.now();
-                            for (final doc in snapshot.data!.docs) {
-                              final data = doc.data();
-                              final checkIn = (data['checkIn'] as Timestamp?)
-                                  ?.toDate();
-                              if (checkIn != null &&
-                                  checkIn.year == today.year &&
-                                  checkIn.month == today.month &&
-                                  checkIn.day == today.day) {
-                                punchInTime = DateFormat(
-                                  'hh:mm a',
-                                ).format(checkIn);
-                                break;
-                              }
-                            }
-                          }
-
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: _TimelineCard(
-                                  icon: Icons.login,
-                                  label: 'Punch In',
-                                  value: punchInTime,
-                                  isDark: isDark,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _TimelineCard(
-                                  icon: Icons.coffee,
-                                  label: 'Break Time',
-                                  value: breakTime,
-                                  isDark: isDark,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 28),
-
-                      // Monthly Summary
-                      Text(
-                        'MONTHLY SUMMARY (${DateFormat('MMM').format(DateTime.now()).toUpperCase()})',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
-                          color: isDark ? Colors.white : Colors.grey.shade900,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: logsStream,
-                        builder: (context, snapshot) {
-                          int presentCount = 0;
-                          int absentCount = 0;
-
-                          if (snapshot.hasData) {
-                            final now = DateTime.now();
-                            for (final doc in snapshot.data!.docs) {
-                              final data = doc.data();
-                              final checkIn = (data['checkIn'] as Timestamp?)
-                                  ?.toDate();
-                              if (checkIn != null &&
-                                  checkIn.year == now.year &&
-                                  checkIn.month == now.month) {
-                                presentCount++;
-                              }
-                            }
-                            // Rough estimate of workdays passed this month
-                            final dayOfMonth = now.day;
-                            int workDays = 0;
-                            for (int d = 1; d <= dayOfMonth; d++) {
-                              final date = DateTime(now.year, now.month, d);
-                              if (date.weekday <= 5) workDays++;
-                            }
-                            absentCount = (workDays - presentCount).clamp(
-                              0,
-                              workDays,
-                            );
-                          }
-
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: _SummaryCard(
-                                  value: '$presentCount',
-                                  label: 'Present',
-                                  valueColor: AppColors.primary,
-                                  isDark: isDark,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _SummaryCard(
-                                  value: '$absentCount',
-                                  label: 'Absent',
-                                  valueColor: AppColors.danger,
-                                  isDark: isDark,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _SummaryCard(
-                                  value: '0',
-                                  label: 'Leaves',
-                                  valueColor: AppColors.success,
-                                  isDark: isDark,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 28),
-
-                      // Quick Actions
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _EmployeeActionButton(
-                              icon: Icons.event_busy,
-                              label: 'Leave Request',
-                              isDark: isDark,
-                              onTap: () => context.push('/leave'),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _EmployeeActionButton(
-                              icon: Icons.history,
-                              label: 'Work History',
-                              isDark: isDark,
-                              onTap: () => context.push('/attendance/history'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
 
-      // ─── Bottom Navigation ───
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: isDark
-                  ? AppColors.primary.withOpacity(0.2)
-                  : Colors.grey.shade200,
-            ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _navIndex,
+        onTap: (index) {
+          if (index == 0) return;
+          HapticFeedback.lightImpact();
+          switch (index) {
+            case 1:
+              context.push('/attendance/history');
+              break;
+            case 2:
+              context.push('/leave');
+              break;
+            case 3:
+              context.push('/profile');
+              break;
+          }
+          if (mounted) setState(() => _navIndex = 0);
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'DASHBOARD',
           ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _navIndex,
-          onTap: (index) {
-            if (index == 0) return; // Already on dashboard
-            HapticFeedback.lightImpact();
-            String? route;
-            switch (index) {
-              case 1:
-                route = '/attendance/history';
-                break;
-              case 2:
-                route = '/leave';
-                break;
-              case 3:
-                route = '/profile';
-                break;
-            }
-            if (route != null) {
-              context.push(route).then((_) {
-                if (mounted) setState(() => _navIndex = 0);
-              });
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
-              label: 'DASHBOARD',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month),
-              label: 'ATTENDANCE',
-            ),
-            BottomNavigationBarItem(icon: Icon(Icons.task), label: 'LEAVE'),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'PROFILE'),
-          ],
-        ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month),
+            label: 'ATTENDANCE',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.task), label: 'LEAVE'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'PROFILE'),
+        ],
       ),
     );
   }
@@ -1467,112 +1533,183 @@ class _DashStatCard extends StatelessWidget {
   }
 }
 
-class _AttendanceTrendChart extends StatelessWidget {
-  const _AttendanceTrendChart({required this.isDark});
+class _AttendanceTrendChart extends ConsumerWidget {
+  const _AttendanceTrendChart({super.key, required this.isDark});
 
   final bool isDark;
 
   @override
-  Widget build(BuildContext context) {
-    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final heights = [0.75, 0.85, 0.6, 0.95, 0.8, 0.4, 0.3];
-    final fills = [0.5, 0.66, 0.33, 0.75, 0.5, 0.25, 0.16];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final attendanceRepo = ref.watch(attendanceRepositoryProvider);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startOfRange = today.subtract(const Duration(days: 6));
+    final endOfRange = today.add(const Duration(days: 1));
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.cardDark : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark
-                ? AppColors.primary.withOpacity(0.1)
-                : Colors.grey.shade200,
-          ),
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Attendance Trend',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  'LAST 7 DAYS',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey.shade500,
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: attendanceRepo.streamLogsForRange(startOfRange, endOfRange),
+      builder: (context, snapshot) {
+        // Fetch total employees count for normalization
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .where('role', isEqualTo: 'employee')
+              .snapshots(),
+          builder: (context, staffSnapshot) {
+            final totalStaff = staffSnapshot.data?.docs.length ?? 0;
+            final logs = snapshot.data?.docs ?? [];
+
+            final List<String> days = [];
+            final List<double> heights = [];
+            final List<double> fills = [];
+
+            for (int i = 0; i < 7; i++) {
+              final day = startOfRange.add(Duration(days: i));
+              days.add(DateFormat('E').format(day));
+
+              final dayLogs = logs.where((doc) {
+                final checkIn = (doc.data()['checkIn'] as Timestamp?)?.toDate();
+                if (checkIn == null) return false;
+                return checkIn.year == day.year &&
+                    checkIn.month == day.month &&
+                    checkIn.day == day.day;
+              }).toList();
+
+              final presentCount = dayLogs.length;
+
+              // Late count (after 09:00)
+              int lateCount = 0;
+              for (final doc in dayLogs) {
+                final checkIn = (doc.data()['checkIn'] as Timestamp?)?.toDate();
+                if (checkIn != null &&
+                    (checkIn.hour > 9 ||
+                        (checkIn.hour == 9 && checkIn.minute > 0))) {
+                  lateCount++;
+                }
+              }
+              final onTimeCount = presentCount - lateCount;
+
+              // Scaling for chart (0.05 min height to avoid empty bars)
+              final h = totalStaff > 0
+                  ? (presentCount / totalStaff).clamp(0.05, 1.0)
+                  : 0.05;
+              final f = presentCount > 0
+                  ? (onTimeCount / presentCount).clamp(0.01, 1.0)
+                  : 0.01;
+
+              heights.add(h);
+              fills.add(f);
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.cardDark : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark
+                        ? AppColors.primary.withOpacity(0.1)
+                        : Colors.grey.shade200,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 140,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(7, (i) {
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: FractionallySizedBox(
-                              heightFactor: heights[i],
-                              alignment: Alignment.bottomCenter,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? AppColors.primary.withOpacity(0.4)
-                                      : AppColors.primary.withOpacity(0.2),
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(3),
-                                  ),
-                                ),
-                                child: Align(
-                                  alignment: Alignment.bottomCenter,
-                                  child: FractionallySizedBox(
-                                    heightFactor: fills[i],
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
-                                        borderRadius: i == 0
-                                            ? const BorderRadius.vertical(
-                                                top: Radius.circular(0),
-                                              )
-                                            : null,
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Attendance Trend',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'LAST 7 DAYS',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 140,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: List.generate(7, (i) {
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 3,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Expanded(
+                                    child: FractionallySizedBox(
+                                      heightFactor: heights[i],
+                                      alignment: Alignment.bottomCenter,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? AppColors.primary.withOpacity(
+                                                  0.4,
+                                                )
+                                              : AppColors.primary.withOpacity(
+                                                  0.2,
+                                                ),
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                                top: Radius.circular(3),
+                                              ),
+                                        ),
+                                        child: Align(
+                                          alignment: Alignment.bottomCenter,
+                                          child: FractionallySizedBox(
+                                            heightFactor: fills[i],
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary,
+                                                borderRadius: i == 0
+                                                    ? const BorderRadius.vertical(
+                                                        top: Radius.circular(0),
+                                                      )
+                                                    : null,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    days[i].toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            days[i].toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.grey.shade400,
-                            ),
-                          ),
-                        ],
+                          );
+                        }),
                       ),
                     ),
-                  );
-                }),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 }

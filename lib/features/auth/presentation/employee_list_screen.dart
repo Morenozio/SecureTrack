@@ -554,30 +554,64 @@ class _EmployeeCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Top row: avatar + info + status
+          // Top row: avatar + info + live status
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isActive
-                      ? AppColors.primary.withOpacity(0.1)
-                      : AppColors.danger.withOpacity(0.1),
-                  border: Border.all(
-                    color: isActive
-                        ? AppColors.primary.withOpacity(0.3)
-                        : AppColors.danger.withOpacity(0.3),
-                  ),
-                ),
-                child: Icon(
-                  Icons.person,
-                  color: isActive ? AppColors.primary : AppColors.danger,
-                  size: 22,
-                ),
+              // Avatar with live indicator
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: attendanceRepo.streamActiveSession(userId),
+                builder: (context, activeSnap) {
+                  final isLive =
+                      activeSnap.hasData && activeSnap.data!.docs.isNotEmpty;
+
+                  return Stack(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isActive
+                              ? AppColors.primary.withOpacity(0.1)
+                              : AppColors.danger.withOpacity(0.1),
+                          border: Border.all(
+                            color: isActive
+                                ? AppColors.primary.withOpacity(0.3)
+                                : AppColors.danger.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.person,
+                          color: isActive
+                              ? AppColors.primary
+                              : AppColors.danger,
+                          size: 22,
+                        ),
+                      ),
+                      // Live dot on avatar
+                      if (isLive)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: AppColors.success,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isDark
+                                    ? AppColors.cardDark
+                                    : Colors.white,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(width: 12),
               // Name + info
@@ -697,129 +731,324 @@ class _EmployeeCard extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          // Today attendance status
+          // Live check-in status row
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: attendanceRepo.streamUserLogs(userId),
-            builder: (context, snap) {
-              String status = 'Absent';
-              String timeStr = '';
+            stream: attendanceRepo.streamActiveSession(userId),
+            builder: (context, activeSnap) {
+              final isLive =
+                  activeSnap.hasData && activeSnap.data!.docs.isNotEmpty;
 
-              if (snap.hasData && snap.data!.docs.isNotEmpty) {
-                final today = DateTime.now();
-                for (final doc in snap.data!.docs) {
-                  final data = doc.data();
-                  final checkIn = (data['checkIn'] as Timestamp?)?.toDate();
-                  if (checkIn != null &&
-                      checkIn.year == today.year &&
-                      checkIn.month == today.month &&
-                      checkIn.day == today.day) {
-                    final checkOut = data['checkOut'] as Timestamp?;
-                    timeStr = DateFormat('hh:mm a').format(checkIn);
-                    if (checkIn.hour >= 9 && checkIn.minute > 0) {
-                      status = 'Late';
-                    } else {
-                      status = 'Present';
+              if (isLive) {
+                final data = activeSnap.data!.docs.first.data();
+                final checkInRaw = data['checkIn'];
+                final checkIn = checkInRaw is Timestamp
+                    ? checkInRaw.toDate()
+                    : DateTime.now();
+                final timeStr = DateFormat('hh:mm a').format(checkIn);
+
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.success.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Pulsing dot
+                      _PulsingDot(color: AppColors.success),
+                      const SizedBox(width: 8),
+                      Text(
+                        'LIVE — Working since $timeStr',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.success,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: AppColors.success,
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // Not currently working — show today's attendance
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: attendanceRepo.streamUserLogs(userId),
+                builder: (context, snap) {
+                  String status = 'Absent';
+                  String timeStr = '';
+
+                  if (snap.hasData && snap.data!.docs.isNotEmpty) {
+                    final today = DateTime.now();
+                    for (final doc in snap.data!.docs) {
+                      final logData = doc.data();
+                      final checkIn = (logData['checkIn'] as Timestamp?)
+                          ?.toDate();
+                      if (checkIn != null &&
+                          checkIn.year == today.year &&
+                          checkIn.month == today.month &&
+                          checkIn.day == today.day) {
+                        // Check admin override first
+                        final adminStatus = logData['adminStatus'] as String?;
+                        if (adminStatus == 'absent') {
+                          status = 'Absent (Admin)';
+                          timeStr = DateFormat('hh:mm a').format(checkIn);
+                          break;
+                        }
+
+                        final checkOut = logData['checkOut'] as Timestamp?;
+                        timeStr = DateFormat('hh:mm a').format(checkIn);
+                        if (checkIn.hour >= 9 && checkIn.minute > 0) {
+                          status = 'Late';
+                        } else {
+                          status = 'Present';
+                        }
+                        if (checkOut != null) {
+                          status = 'Done';
+                          timeStr +=
+                              ' - ${DateFormat("hh:mm a").format(checkOut.toDate())}';
+                        }
+                        break;
+                      }
                     }
-                    if (checkOut != null) {
-                      status = 'Done';
-                      timeStr +=
-                          ' - ${DateFormat("hh:mm a").format(checkOut.toDate())}';
-                    }
-                    break;
                   }
-                }
-              }
 
-              Color badgeColor;
-              switch (status) {
-                case 'Present':
-                  badgeColor = AppColors.success;
-                  break;
-                case 'Late':
-                  badgeColor = AppColors.warning;
-                  break;
-                case 'Done':
-                  badgeColor = Colors.grey;
-                  break;
-                default:
-                  badgeColor = AppColors.danger;
-              }
+                  Color badgeColor;
+                  switch (status) {
+                    case 'Present':
+                      badgeColor = AppColors.success;
+                      break;
+                    case 'Late':
+                      badgeColor = AppColors.warning;
+                      break;
+                    case 'Done':
+                      badgeColor = Colors.grey;
+                      break;
+                    default:
+                      badgeColor = AppColors.danger;
+                  }
 
-              return Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: badgeColor.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(9999),
-                      border: Border.all(color: badgeColor.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: badgeColor,
-                            shape: BoxShape.circle,
+                  return Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(9999),
+                          border: Border.all(
+                            color: badgeColor.withOpacity(0.3),
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: badgeColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              status.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: badgeColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (timeStr.isNotEmpty) ...[
+                        const SizedBox(width: 8),
                         Text(
-                          status.toUpperCase(),
+                          timeStr,
                           style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: badgeColor,
+                            fontSize: 11,
+                            color: isDark
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade500,
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  if (timeStr.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      timeStr,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
-                  const Spacer(),
-                  // Action buttons
-                  _ActionIcon(
-                    icon: Icons.visibility_outlined,
-                    tooltip: 'View Attendance',
-                    color: AppColors.primary,
-                    isDark: isDark,
-                    onTap: onView,
-                  ),
-                  const SizedBox(width: 4),
-                  _ActionIcon(
-                    icon: Icons.edit_outlined,
-                    tooltip: 'Edit',
-                    color: AppColors.warning,
-                    isDark: isDark,
-                    onTap: onEdit,
-                  ),
-                  const SizedBox(width: 4),
-                  _ActionIcon(
-                    icon: Icons.delete_outline,
-                    tooltip: 'Delete',
-                    color: AppColors.danger,
-                    isDark: isDark,
-                    onTap: onDelete,
-                  ),
-                ],
+                    ],
+                  );
+                },
               );
             },
+          ),
+
+          const SizedBox(height: 8),
+
+          // Bottom row: availability toggle + action buttons
+          Row(
+            children: [
+              // Admin attendance override (Present/Absent)
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: attendanceRepo.streamUserLogs(userId),
+                builder: (context, logSnap) {
+                  // Find today's log
+                  String? todayLogId;
+                  String? currentAdminStatus;
+
+                  if (logSnap.hasData) {
+                    final today = DateTime.now();
+                    for (final doc in logSnap.data!.docs) {
+                      final d = doc.data();
+                      final ci = (d['checkIn'] as Timestamp?)?.toDate();
+                      if (ci != null &&
+                          ci.year == today.year &&
+                          ci.month == today.month &&
+                          ci.day == today.day) {
+                        todayLogId = doc.id;
+                        currentAdminStatus = d['adminStatus'] as String?;
+                        break;
+                      }
+                    }
+                  }
+
+                  // No log today — nothing to override
+                  if (todayLogId == null) {
+                    return const SizedBox.shrink();
+                  }
+
+                  final isAbsent = currentAdminStatus == 'absent';
+                  final btnColor = isAbsent
+                      ? AppColors.danger
+                      : AppColors.success;
+
+                  return GestureDetector(
+                    onTap: () async {
+                      final newStatus = isAbsent ? null : 'absent';
+                      final logsRef = FirebaseFirestore.instance.collection(
+                        'attendance_logs',
+                      );
+                      if (newStatus == null) {
+                        await logsRef.doc(todayLogId).update({
+                          'adminStatus': FieldValue.delete(),
+                        });
+                      } else {
+                        await logsRef.doc(todayLogId).update({
+                          'adminStatus': newStatus,
+                        });
+                      }
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isAbsent
+                                  ? '$name marked as Present'
+                                  : '$name marked as Absent by Admin',
+                            ),
+                            backgroundColor: isAbsent
+                                ? AppColors.success
+                                : AppColors.warning,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: btnColor.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: btnColor.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isAbsent
+                                ? Icons.person_off
+                                : Icons.check_circle_outline,
+                            size: 14,
+                            color: btnColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isAbsent ? 'Mark Present' : 'Mark Absent',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: btnColor,
+                            ),
+                          ),
+                          if (isAbsent) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.danger.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'ADMIN',
+                                style: TextStyle(
+                                  fontSize: 7,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.danger,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const Spacer(),
+
+              // Action buttons
+              _ActionIcon(
+                icon: Icons.visibility_outlined,
+                tooltip: 'View Attendance',
+                color: AppColors.primary,
+                isDark: isDark,
+                onTap: onView,
+              ),
+              const SizedBox(width: 4),
+              _ActionIcon(
+                icon: Icons.edit_outlined,
+                tooltip: 'Edit',
+                color: AppColors.warning,
+                isDark: isDark,
+                onTap: onEdit,
+              ),
+              const SizedBox(width: 4),
+              _ActionIcon(
+                icon: Icons.delete_outline,
+                tooltip: 'Delete',
+                color: AppColors.danger,
+                isDark: isDark,
+                onTap: onDelete,
+              ),
+            ],
           ),
         ],
       ),
@@ -860,6 +1089,53 @@ class _ActionIcon extends StatelessWidget {
             child: Icon(icon, size: 16, color: color),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────
+//  Pulsing Live Dot
+// ──────────────────────────────────────────────────────────
+
+class _PulsingDot extends StatefulWidget {
+  const _PulsingDot({required this.color});
+  final Color color;
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(
+        begin: 0.3,
+        end: 1.0,
+      ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut)),
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
       ),
     );
   }

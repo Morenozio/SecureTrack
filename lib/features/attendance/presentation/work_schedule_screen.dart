@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../../../core/widgets/app_background.dart';
 import '../../auth/data/user_providers.dart';
 import '../data/work_schedule_repository.dart';
@@ -69,10 +70,9 @@ class _WorkScheduleScreenState extends ConsumerState<WorkScheduleScreen> {
   Future<void> _saveSchedule() async {
     setState(() => _isSaving = true);
     try {
-      await ref.read(workScheduleRepositoryProvider).setEmployeeSchedule(
-            userId: widget.userId,
-            schedule: _schedule,
-          );
+      await ref
+          .read(workScheduleRepositoryProvider)
+          .setEmployeeSchedule(userId: widget.userId, schedule: _schedule);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -84,10 +84,7 @@ class _WorkScheduleScreenState extends ConsumerState<WorkScheduleScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -135,65 +132,77 @@ class _WorkScheduleScreenState extends ConsumerState<WorkScheduleScreen> {
         ),
         title: Text('Jadwal Kerja - ${widget.userName}'),
       ),
-      body: AppBackground(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Atur Hari Kerja',
-                      style: textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : null,
+      body: AnimatedPage(
+        child: AppBackground(
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Atur Hari Kerja',
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : null,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Pilih hari kerja untuk ${widget.userName}',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: isDark ? Colors.white70 : Colors.black87,
+                      const SizedBox(height: 8),
+                      Text(
+                        'Pilih hari kerja untuk ${widget.userName}',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    _buildDayToggle('monday', 'Senin', textTheme, isDark),
-                    _buildDayToggle('tuesday', 'Selasa', textTheme, isDark),
-                    _buildDayToggle('wednesday', 'Rabu', textTheme, isDark),
-                    _buildDayToggle('thursday', 'Kamis', textTheme, isDark),
-                    _buildDayToggle('friday', 'Jumat', textTheme, isDark),
-                    _buildDayToggle('saturday', 'Sabtu', textTheme, isDark),
-                    _buildDayToggle('sunday', 'Minggu', textTheme, isDark),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _saveSchedule,
-                      icon: _isSaving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(_isSaving ? 'Menyimpan...' : 'Simpan Jadwal'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        minimumSize: const Size(double.infinity, 50),
+                      const SizedBox(height: 20),
+                      _buildDayToggle('monday', 'Senin', textTheme, isDark),
+                      _buildDayToggle('tuesday', 'Selasa', textTheme, isDark),
+                      _buildDayToggle('wednesday', 'Rabu', textTheme, isDark),
+                      _buildDayToggle('thursday', 'Kamis', textTheme, isDark),
+                      _buildDayToggle('friday', 'Jumat', textTheme, isDark),
+                      _buildDayToggle('saturday', 'Sabtu', textTheme, isDark),
+                      _buildDayToggle('sunday', 'Minggu', textTheme, isDark),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: _isSaving ? null : _saveSchedule,
+                        icon: _isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.save),
+                        label: Text(
+                          _isSaving ? 'Menyimpan...' : 'Simpan Jadwal',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          minimumSize: const Size(double.infinity, 50),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDayToggle(String key, String label, TextTheme textTheme, bool isDark) {
+  Widget _buildDayToggle(
+    String key,
+    String label,
+    TextTheme textTheme,
+    bool isDark,
+  ) {
     return SwitchListTile(
       title: Text(
         label,

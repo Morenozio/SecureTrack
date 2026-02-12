@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../../auth/application/auth_controller.dart';
 
 /// Firestore collection for app settings
@@ -143,272 +144,278 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // ─── Company Info ───
-                _SectionHeader(title: 'Company Information', isDark: isDark),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  isDark: isDark,
-                  children: [
-                    TextField(
-                      controller: _companyNameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Company Name',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.business),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _companyAddressCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Company Address',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_on),
-                      ),
-                      maxLines: 2,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // ─── Work Hours ───
-                _SectionHeader(title: 'Work Hours', isDark: isDark),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  isDark: isDark,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _TimeTile(
-                            label: 'Start Time',
-                            time: _workStart,
-                            isDark: isDark,
-                            onTap: () async {
-                              final picked = await showTimePicker(
-                                context: context,
-                                initialTime: _workStart,
-                              );
-                              if (picked != null) {
-                                setState(() => _workStart = picked);
-                              }
-                            },
-                          ),
+      body: AnimatedPage(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // ─── Company Info ───
+                  _SectionHeader(title: 'Company Information', isDark: isDark),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    isDark: isDark,
+                    children: [
+                      TextField(
+                        controller: _companyNameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Company Name',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.business),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _TimeTile(
-                            label: 'End Time',
-                            time: _workEnd,
-                            isDark: isDark,
-                            onTap: () async {
-                              final picked = await showTimePicker(
-                                context: context,
-                                initialTime: _workEnd,
-                              );
-                              if (picked != null) {
-                                setState(() => _workEnd = picked);
-                              }
-                            },
-                          ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _companyAddressCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Company Address',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ─── Work Hours ───
+                  _SectionHeader(title: 'Work Hours', isDark: isDark),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    isDark: isDark,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _TimeTile(
+                              label: 'Start Time',
+                              time: _workStart,
+                              isDark: isDark,
+                              onTap: () async {
+                                final picked = await showTimePicker(
+                                  context: context,
+                                  initialTime: _workStart,
+                                );
+                                if (picked != null) {
+                                  setState(() => _workStart = picked);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _TimeTile(
+                              label: 'End Time',
+                              time: _workEnd,
+                              isDark: isDark,
+                              onTap: () async {
+                                final picked = await showTimePicker(
+                                  context: context,
+                                  initialTime: _workEnd,
+                                );
+                                if (picked != null) {
+                                  setState(() => _workEnd = picked);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Late Threshold (minutes)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Mark as late after $_lateThresholdMinutes min past start time',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? Colors.grey.shade400
+                                        : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
-                                'Late Threshold (minutes)',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
+                              IconButton(
+                                onPressed: _lateThresholdMinutes > 0
+                                    ? () => setState(
+                                        () => _lateThresholdMinutes--,
+                                      )
+                                    : null,
+                                icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  size: 20,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Mark as late after $_lateThresholdMinutes min past start time',
-                                style: TextStyle(
-                                  fontSize: 11,
+                              Container(
+                                width: 40,
+                                alignment: Alignment.center,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
                                   color: isDark
-                                      ? Colors.grey.shade400
-                                      : Colors.grey.shade600,
+                                      ? AppColors.backgroundDark
+                                      : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '$_lateThresholdMinutes',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () =>
+                                    setState(() => _lateThresholdMinutes++),
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                  size: 20,
                                 ),
                               ),
                             ],
                           ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ─── Attendance Rules ───
+                  _SectionHeader(title: 'Attendance Rules', isDark: isDark),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    isDark: isDark,
+                    children: [
+                      SwitchListTile(
+                        title: const Text('Require WiFi Verification'),
+                        subtitle: const Text(
+                          'Employees must be on office WiFi to check in',
                         ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              onPressed: _lateThresholdMinutes > 0
-                                  ? () =>
-                                        setState(() => _lateThresholdMinutes--)
-                                  : null,
-                              icon: const Icon(
-                                Icons.remove_circle_outline,
-                                size: 20,
-                              ),
-                            ),
-                            Container(
-                              width: 40,
-                              alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? AppColors.backgroundDark
-                                    : Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '$_lateThresholdMinutes',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () =>
-                                  setState(() => _lateThresholdMinutes++),
-                              icon: const Icon(
-                                Icons.add_circle_outline,
-                                size: 20,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // ─── Attendance Rules ───
-                _SectionHeader(title: 'Attendance Rules', isDark: isDark),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  isDark: isDark,
-                  children: [
-                    SwitchListTile(
-                      title: const Text('Require WiFi Verification'),
-                      subtitle: const Text(
-                        'Employees must be on office WiFi to check in',
-                      ),
-                      value: _requireWifi,
-                      activeColor: AppColors.primary,
-                      onChanged: (v) => setState(() => _requireWifi = v),
-                    ),
-                    Divider(
-                      height: 1,
-                      color: isDark
-                          ? AppColors.primary.withOpacity(0.1)
-                          : Colors.grey.shade200,
-                    ),
-                    SwitchListTile(
-                      title: const Text('Auto-mark Absent'),
-                      subtitle: const Text(
-                        'Automatically mark employees absent if not checked in by end of day',
-                      ),
-                      value: _autoAbsent,
-                      activeColor: AppColors.primary,
-                      onChanged: (v) => setState(() => _autoAbsent = v),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // ─── Appearance ───
-                _SectionHeader(title: 'Appearance', isDark: isDark),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  isDark: isDark,
-                  children: [
-                    ListTile(
-                      leading: Icon(
-                        isDark ? Icons.dark_mode : Icons.light_mode,
-                        color: AppColors.primary,
-                      ),
-                      title: const Text('Dark Mode'),
-                      subtitle: Text(
-                        isDark ? 'Currently dark' : 'Currently light',
-                      ),
-                      trailing: Switch(
-                        value: isDark,
+                        value: _requireWifi,
                         activeColor: AppColors.primary,
-                        onChanged: (_) =>
-                            ref.read(themeModeProvider.notifier).toggleTheme(),
+                        onChanged: (v) => setState(() => _requireWifi = v),
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // ─── Quick Links ───
-                _SectionHeader(title: 'Administration', isDark: isDark),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  isDark: isDark,
-                  children: [
-                    ListTile(
-                      leading: Icon(
-                        Icons.admin_panel_settings,
-                        color: AppColors.primary,
+                      Divider(
+                        height: 1,
+                        color: isDark
+                            ? AppColors.primary.withOpacity(0.1)
+                            : Colors.grey.shade200,
                       ),
-                      title: const Text('Manage Admin Roles'),
-                      subtitle: const Text('Promote/demote users'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => context.push('/admin/users'),
-                    ),
-                    Divider(
-                      height: 1,
-                      color: isDark
-                          ? AppColors.primary.withOpacity(0.1)
-                          : Colors.grey.shade200,
-                    ),
-                    ListTile(
-                      leading: Icon(Icons.wifi, color: AppColors.primary),
-                      title: const Text('WiFi Networks'),
-                      subtitle: const Text('Manage office WiFi list'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => context.push('/admin/wifi-networks'),
-                    ),
-                    Divider(
-                      height: 1,
-                      color: isDark
-                          ? AppColors.primary.withOpacity(0.1)
-                          : Colors.grey.shade200,
-                    ),
-                    ListTile(
-                      leading: Icon(Icons.logout, color: AppColors.danger),
-                      title: Text(
-                        'Sign Out',
-                        style: TextStyle(color: AppColors.danger),
+                      SwitchListTile(
+                        title: const Text('Auto-mark Absent'),
+                        subtitle: const Text(
+                          'Automatically mark employees absent if not checked in by end of day',
+                        ),
+                        value: _autoAbsent,
+                        activeColor: AppColors.primary,
+                        onChanged: (v) => setState(() => _autoAbsent = v),
                       ),
-                      onTap: () {
-                        ref.read(authControllerProvider.notifier).signOut();
-                        context.go('/auth');
-                      },
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
 
-                const SizedBox(height: 32),
-              ],
-            ),
+                  const SizedBox(height: 24),
+
+                  // ─── Appearance ───
+                  _SectionHeader(title: 'Appearance', isDark: isDark),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    isDark: isDark,
+                    children: [
+                      ListTile(
+                        leading: Icon(
+                          isDark ? Icons.dark_mode : Icons.light_mode,
+                          color: AppColors.primary,
+                        ),
+                        title: const Text('Dark Mode'),
+                        subtitle: Text(
+                          isDark ? 'Currently dark' : 'Currently light',
+                        ),
+                        trailing: Switch(
+                          value: isDark,
+                          activeColor: AppColors.primary,
+                          onChanged: (_) => ref
+                              .read(themeModeProvider.notifier)
+                              .toggleTheme(),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ─── Quick Links ───
+                  _SectionHeader(title: 'Administration', isDark: isDark),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    isDark: isDark,
+                    children: [
+                      ListTile(
+                        leading: Icon(
+                          Icons.admin_panel_settings,
+                          color: AppColors.primary,
+                        ),
+                        title: const Text('Manage Admin Roles'),
+                        subtitle: const Text('Promote/demote users'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push('/admin/users'),
+                      ),
+                      Divider(
+                        height: 1,
+                        color: isDark
+                            ? AppColors.primary.withOpacity(0.1)
+                            : Colors.grey.shade200,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.wifi, color: AppColors.primary),
+                        title: const Text('WiFi Networks'),
+                        subtitle: const Text('Manage office WiFi list'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push('/admin/wifi-networks'),
+                      ),
+                      Divider(
+                        height: 1,
+                        color: isDark
+                            ? AppColors.primary.withOpacity(0.1)
+                            : Colors.grey.shade200,
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.logout, color: AppColors.danger),
+                        title: Text(
+                          'Sign Out',
+                          style: TextStyle(color: AppColors.danger),
+                        ),
+                        onTap: () {
+                          ref.read(authControllerProvider.notifier).signOut();
+                          context.go('/auth');
+                        },
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 32),
+                ],
+              ),
+      ),
     );
   }
 }

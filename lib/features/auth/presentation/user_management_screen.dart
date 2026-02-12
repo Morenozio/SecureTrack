@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../../../core/widgets/app_background.dart';
 import '../application/auth_controller.dart';
 import '../data/user_providers.dart';
@@ -12,13 +13,18 @@ class UserManagementScreen extends ConsumerStatefulWidget {
   const UserManagementScreen({super.key});
 
   @override
-  ConsumerState<UserManagementScreen> createState() => _UserManagementScreenState();
+  ConsumerState<UserManagementScreen> createState() =>
+      _UserManagementScreenState();
 }
 
 class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   bool _isProcessing = false;
 
-  Future<void> _changeUserRole(String userId, String currentRole, String newRole) async {
+  Future<void> _changeUserRole(
+    String userId,
+    String currentRole,
+    String newRole,
+  ) async {
     if (currentRole == newRole) return;
 
     final confirmed = await showDialog<bool>(
@@ -68,10 +74,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -86,9 +89,11 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(isActive ? 'Non-aktifkan karyawan?' : 'Aktifkan karyawan?'),
-        content: Text(isActive
-            ? 'Karyawan ini tidak akan bisa login.'
-            : 'Karyawan ini akan bisa login kembali.'),
+        content: Text(
+          isActive
+              ? 'Karyawan ini tidak akan bisa login.'
+              : 'Karyawan ini akan bisa login kembali.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -112,7 +117,9 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isActive ? 'Karyawan dinon-aktifkan' : 'Karyawan diaktifkan'),
+          content: Text(
+            isActive ? 'Karyawan dinon-aktifkan' : 'Karyawan diaktifkan',
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -141,7 +148,10 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
             child: const Text('Batal'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Hapus'),
           ),
@@ -156,7 +166,10 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       await ref.read(authControllerProvider.notifier).deleteUserDoc(userId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil karyawan dihapus'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Profil karyawan dihapus'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       if (mounted) {
@@ -172,13 +185,18 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   Future<void> _resetPassword(String email) async {
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email kosong'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Email kosong'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
     setState(() => _isProcessing = true);
     try {
-      await ref.read(authControllerProvider.notifier).sendPasswordResetEmail(email);
+      await ref
+          .read(authControllerProvider.notifier)
+          .sendPasswordResetEmail(email);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -202,8 +220,12 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
     Map<String, dynamic> data,
   ) async {
     final nameCtrl = TextEditingController(text: data['name'] as String? ?? '');
-    final emailCtrl = TextEditingController(text: data['email'] as String? ?? '');
-    final contactCtrl = TextEditingController(text: data['contact'] as String? ?? '');
+    final emailCtrl = TextEditingController(
+      text: data['email'] as String? ?? '',
+    );
+    final contactCtrl = TextEditingController(
+      text: data['contact'] as String? ?? '',
+    );
     String role = (data['role'] as String?) ?? 'employee';
 
     await showDialog(
@@ -235,9 +257,14 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: role,
-                  decoration: const InputDecoration(labelText: 'Jabatan / Role'),
+                  decoration: const InputDecoration(
+                    labelText: 'Jabatan / Role',
+                  ),
                   items: const [
-                    DropdownMenuItem(value: 'employee', child: Text('Karyawan')),
+                    DropdownMenuItem(
+                      value: 'employee',
+                      child: Text('Karyawan'),
+                    ),
                     DropdownMenuItem(value: 'admin', child: Text('Admin')),
                   ],
                   onChanged: (val) {
@@ -263,7 +290,9 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                 Navigator.of(context).pop();
                 setState(() => _isProcessing = true);
                 try {
-                  await ref.read(authControllerProvider.notifier).updateUserProfile(
+                  await ref
+                      .read(authControllerProvider.notifier)
+                      .updateUserProfile(
                         userId: userId,
                         name: nameCtrl.text.trim(),
                         email: emailCtrl.text.trim(),
@@ -272,12 +301,18 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                       );
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Data karyawan diperbarui'), backgroundColor: Colors.green),
+                    const SnackBar(
+                      content: Text('Data karyawan diperbarui'),
+                      backgroundColor: Colors.green,
+                    ),
                   );
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red,
+                      ),
                     );
                   }
                 } finally {
@@ -296,7 +331,10 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final usersStream = ref.watch(usersCollectionProvider).orderBy('name').snapshots();
+    final usersStream = ref
+        .watch(usersCollectionProvider)
+        .orderBy('name')
+        .snapshots();
     final currentUser = ref.watch(authStateProvider).valueOrNull;
 
     return Scaffold(
@@ -313,99 +351,105 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
         ),
         title: const Text('Kelola User'),
       ),
-      body: AppBackground(
-        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: usersStream,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+      body: AnimatedPage(
+        child: AppBackground(
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: usersStream,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            if (snapshot.hasError) {
-              return Center(
-                child: Text('Error: ${snapshot.error}'),
-              );
-            }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
 
-            final docs = snapshot.data?.docs ?? [];
-            if (docs.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.people_outline,
-                      size: 64,
-                      color: isDark ? Colors.white54 : Colors.black54,
-                    ),
-                    const SizedBox(height: 16),
+              final docs = snapshot.data?.docs ?? [];
+              if (docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.people_outline,
+                        size: 64,
+                        color: isDark ? Colors.white54 : Colors.black54,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Belum ada user terdaftar',
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // Separate users by role
+              final adminUsers =
+                  <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+              final employeeUsers =
+                  <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+              for (final doc in docs) {
+                final role = doc.data()['role'] as String? ?? 'employee';
+                if (role == 'admin') {
+                  adminUsers.add(doc);
+                } else {
+                  employeeUsers.add(doc);
+                }
+              }
+
+              return ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  if (_isProcessing) ...[
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 12),
+                  ],
+                  if (adminUsers.isNotEmpty) ...[
                     Text(
-                      'Belum ada user terdaftar',
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: isDark ? Colors.white70 : Colors.black87,
+                      'Admin (${adminUsers.length})',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : null,
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    ...adminUsers.map(
+                      (doc) => _buildUserCard(
+                        context,
+                        doc,
+                        textTheme,
+                        isDark,
+                        currentUser?.uid,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                   ],
-                ),
-              );
-            }
-
-            // Separate users by role
-            final adminUsers = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-            final employeeUsers = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-
-            for (final doc in docs) {
-              final role = doc.data()['role'] as String? ?? 'employee';
-              if (role == 'admin') {
-                adminUsers.add(doc);
-              } else {
-                employeeUsers.add(doc);
-              }
-            }
-
-            return ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                if (_isProcessing) ...[
-                  const LinearProgressIndicator(),
-                  const SizedBox(height: 12),
-                ],
-                if (adminUsers.isNotEmpty) ...[
                   Text(
-                    'Admin (${adminUsers.length})',
+                    'Karyawan (${employeeUsers.length})',
                     style: textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: isDark ? Colors.white : null,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  ...adminUsers.map((doc) => _buildUserCard(
-                        context,
-                        doc,
-                        textTheme,
-                        isDark,
-                        currentUser?.uid,
-                      )),
-                  const SizedBox(height: 24),
-                ],
-                Text(
-                  'Karyawan (${employeeUsers.length})',
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : null,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...employeeUsers.map((doc) => _buildUserCard(
+                  ...employeeUsers.map(
+                    (doc) => _buildUserCard(
                       context,
                       doc,
                       textTheme,
                       isDark,
                       currentUser?.uid,
-                    )),
-              ],
-            );
-          },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -439,10 +483,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
             color: role == 'admin' ? AppColors.accent : Colors.blue,
           ),
         ),
-        title: Text(
-          name,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -457,15 +498,21 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               children: [
                 Chip(
                   label: Text(role == 'admin' ? 'Admin' : 'Karyawan'),
-                  backgroundColor:
-                      role == 'admin' ? AppColors.accent.withOpacity(0.15) : Colors.blue.withOpacity(0.15),
+                  backgroundColor: role == 'admin'
+                      ? AppColors.accent.withOpacity(0.15)
+                      : Colors.blue.withOpacity(0.15),
                 ),
                 const SizedBox(width: 8),
                 Chip(
                   label: Text(isActive ? 'Aktif' : 'Non-aktif'),
-                  backgroundColor:
-                      isActive ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
-                  labelStyle: TextStyle(color: isActive ? Colors.green.shade800 : Colors.red.shade800),
+                  backgroundColor: isActive
+                      ? Colors.green.withOpacity(0.15)
+                      : Colors.red.withOpacity(0.15),
+                  labelStyle: TextStyle(
+                    color: isActive
+                        ? Colors.green.shade800
+                        : Colors.red.shade800,
+                  ),
                 ),
               ],
             ),
@@ -496,7 +543,9 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                 if (currentUserId != null && currentUserId == userId) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Tidak bisa menghapus akun yang sedang dipakai'),
+                      content: Text(
+                        'Tidak bisa menghapus akun yang sedang dipakai',
+                      ),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -521,7 +570,10 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               value: 'toggle_active',
               child: Row(
                 children: [
-                  Icon(isActive ? Icons.pause_circle : Icons.play_circle, size: 20),
+                  Icon(
+                    isActive ? Icons.pause_circle : Icons.play_circle,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(isActive ? 'Non-aktifkan' : 'Aktifkan'),
                 ],
@@ -553,4 +605,3 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
     );
   }
 }
-

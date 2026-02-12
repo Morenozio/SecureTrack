@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../../../core/widgets/app_background.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/user_providers.dart';
@@ -86,98 +87,114 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ],
       ),
-      body: AppBackground(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Center(
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 42,
-                    backgroundColor: AppColors.accent.withOpacity(0.2),
-                    backgroundImage:
-                        (user?.photoUrl ?? '').isNotEmpty ? NetworkImage(user!.photoUrl!) : null,
-                    child: (user?.photoUrl ?? '').isEmpty
-                        ? const Icon(Icons.person, size: 48, color: AppColors.accent)
-                        : null,
-                  ),
-                  TextButton(
-                    onPressed: user == null || _uploadingPhoto
-                        ? null
-                        : () async {
-                            try {
-                              await _pickAndUploadPhoto(user.id);
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Foto profil diperbarui')),
-                              );
-                            } catch (e) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(content: Text(e.toString())));
-                            }
-                          },
-                    child: _uploadingPhoto
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Ubah foto profil'),
-                  ),
-                ],
+      body: AnimatedPage(
+        child: AppBackground(
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Center(
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 42,
+                      backgroundColor: AppColors.accent.withOpacity(0.2),
+                      backgroundImage: (user?.photoUrl ?? '').isNotEmpty
+                          ? NetworkImage(user!.photoUrl!)
+                          : null,
+                      child: (user?.photoUrl ?? '').isEmpty
+                          ? const Icon(
+                              Icons.person,
+                              size: 48,
+                              color: AppColors.accent,
+                            )
+                          : null,
+                    ),
+                    TextButton(
+                      onPressed: user == null || _uploadingPhoto
+                          ? null
+                          : () async {
+                              try {
+                                await _pickAndUploadPhoto(user.id);
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Foto profil diperbarui'),
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(e.toString())),
+                                );
+                              }
+                            },
+                      child: _uploadingPhoto
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Ubah foto profil'),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text('Data Pribadi', style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : null,
-            )),
-            const SizedBox(height: 8),
-            TextField(
-              decoration: const InputDecoration(labelText: 'Nama'),
-              controller: _nameController,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              decoration: const InputDecoration(labelText: 'Email'),
-              controller: _emailController,
-              readOnly: true,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              decoration: const InputDecoration(labelText: 'Kontak'),
-              controller: _contactController,
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: user == null
-                  ? null
-                  : () async {
-                      try {
-                        await _saveProfile(user.id);
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Profil disimpan')),
-                        );
-                      } catch (e) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(e.toString())),
-                        );
-                      }
-                    },
-              child: const Text('Simpan Perubahan'),
-            ),
-            const SizedBox(height: 24),
-            Text('Pengaturan Tampilan', style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : null,
-            )),
-            const SizedBox(height: 8),
-            _ThemeSelectorCard(),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                'Data Pribadi',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : null,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                decoration: const InputDecoration(labelText: 'Nama'),
+                controller: _nameController,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                decoration: const InputDecoration(labelText: 'Email'),
+                controller: _emailController,
+                readOnly: true,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                decoration: const InputDecoration(labelText: 'Kontak'),
+                controller: _contactController,
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: user == null
+                    ? null
+                    : () async {
+                        try {
+                          await _saveProfile(user.id);
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Profil disimpan')),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(e.toString())));
+                        }
+                      },
+                child: const Text('Simpan Perubahan'),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Pengaturan Tampilan',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : null,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _ThemeSelectorCard(),
+            ],
+          ),
         ),
       ),
     );
@@ -193,7 +210,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _pickAndUploadPhoto(String uid) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (picked == null) return;
 
     setState(() => _uploadingPhoto = true);
@@ -237,7 +257,9 @@ class _ThemeSelectorCard extends ConsumerWidget {
                     icon: Icons.light_mode,
                     label: 'Terang',
                     isSelected: themeMode == ThemeMode.light,
-                    onTap: () => ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light),
+                    onTap: () => ref
+                        .read(themeModeProvider.notifier)
+                        .setThemeMode(ThemeMode.light),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -246,7 +268,9 @@ class _ThemeSelectorCard extends ConsumerWidget {
                     icon: Icons.dark_mode,
                     label: 'Gelap',
                     isSelected: themeMode == ThemeMode.dark,
-                    onTap: () => ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark),
+                    onTap: () => ref
+                        .read(themeModeProvider.notifier)
+                        .setThemeMode(ThemeMode.dark),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -255,7 +279,9 @@ class _ThemeSelectorCard extends ConsumerWidget {
                     icon: Icons.settings_suggest,
                     label: 'Sistem',
                     isSelected: themeMode == ThemeMode.system,
-                    onTap: () => ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.system),
+                    onTap: () => ref
+                        .read(themeModeProvider.notifier)
+                        .setThemeMode(ThemeMode.system),
                   ),
                 ),
               ],
@@ -285,18 +311,26 @@ class _ThemeOptionTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selectedColor = isDark ? AppColors.accent : AppColors.navy;
-    final unselectedColor = isDark ? Colors.white70 : colorScheme.onSurface.withOpacity(0.6);
-    
+    final unselectedColor = isDark
+        ? Colors.white70
+        : colorScheme.onSurface.withOpacity(0.6);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: isSelected ? selectedColor.withOpacity(0.15) : Colors.transparent,
+          color: isSelected
+              ? selectedColor.withOpacity(0.15)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? selectedColor : (isDark ? Colors.white24 : colorScheme.outline.withOpacity(0.3)),
+            color: isSelected
+                ? selectedColor
+                : (isDark
+                      ? Colors.white24
+                      : colorScheme.outline.withOpacity(0.3)),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -312,7 +346,9 @@ class _ThemeOptionTile extends StatelessWidget {
               label,
               style: TextStyle(
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? selectedColor : (isDark ? Colors.white : colorScheme.onSurface),
+                color: isSelected
+                    ? selectedColor
+                    : (isDark ? Colors.white : colorScheme.onSurface),
                 fontSize: 12,
               ),
             ),
@@ -322,4 +358,3 @@ class _ThemeOptionTile extends StatelessWidget {
     );
   }
 }
-

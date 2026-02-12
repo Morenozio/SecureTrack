@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../../../core/widgets/app_background.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/user_providers.dart';
@@ -105,136 +106,138 @@ class _AddEmployeeScreenState extends ConsumerState<AddEmployeeScreen> {
         leading: context.canPop() ? const BackButton() : null,
         title: const Text('Tambah Karyawan'),
       ),
-      body: AppBackground(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Tambah Karyawan Baru',
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : null,
+      body: AnimatedPage(
+        child: AppBackground(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Tambah Karyawan Baru',
+                    style: textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : null,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Isi data karyawan yang akan ditambahkan ke sistem',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: isDark ? Colors.white70 : Colors.black87,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Isi data karyawan yang akan ditambahkan ke sistem',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nama Lengkap *',
-                    hintText: 'Masukkan nama karyawan',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nama Lengkap *',
+                      hintText: 'Masukkan nama karyawan',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Nama wajib diisi';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Nama wajib diisi';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email *',
-                    hintText: 'nama@perusahaan.com',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Email *',
+                      hintText: 'nama@perusahaan.com',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.email),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Email wajib diisi';
+                      }
+                      if (!value.contains('@')) {
+                        return 'Format email tidak valid';
+                      }
+                      return null;
+                    },
                   ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Email wajib diisi';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Format email tidak valid';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Password *',
-                    hintText: 'Minimal 8 karakter',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Password *',
+                      hintText: 'Minimal 8 karakter',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.lock),
+                    ),
+                    obscureText: true,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Password wajib diisi';
+                      }
+                      if (value.length < 6) {
+                        return 'Password minimal 6 karakter';
+                      }
+                      return null;
+                    },
                   ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Password wajib diisi';
-                    }
-                    if (value.length < 6) {
-                      return 'Password minimal 6 karakter';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _departmentController,
-                  decoration: const InputDecoration(
-                    labelText: 'Department',
-                    hintText: 'e.g. Engineering, Marketing',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.business),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _departmentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Department',
+                      hintText: 'e.g. Engineering, Marketing',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.business),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _positionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Position',
-                    hintText: 'e.g. Software Engineer, Manager',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.work),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _positionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Position',
+                      hintText: 'e.g. Software Engineer, Manager',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.work),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _contactController,
-                  decoration: const InputDecoration(
-                    labelText: 'Kontak (Opsional)',
-                    hintText: 'No. WhatsApp atau Telepon',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.phone),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _contactController,
+                    decoration: const InputDecoration(
+                      labelText: 'Kontak (Opsional)',
+                      hintText: 'No. WhatsApp atau Telepon',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.phone),
+                    ),
+                    keyboardType: TextInputType.phone,
                   ),
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _submit,
-                  icon: _isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.person_add),
-                  label: Text(
-                    _isLoading ? 'Menambahkan...' : 'Tambah Karyawan',
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _submit,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.person_add),
+                    label: Text(
+                      _isLoading ? 'Menambahkan...' : 'Tambah Karyawan',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -25,18 +25,40 @@ class AttendanceRepository {
     return _logs.orderBy('checkIn', descending: true).limit(20).snapshots();
   }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamActiveSession(
+    String userId,
+  ) {
+    return _logs
+        .where('userId', isEqualTo: userId)
+        .where('checkOut', isNull: true)
+        .limit(1)
+        .snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamLogsForRange(
+    DateTime start,
+    DateTime end,
+  ) {
+    return _logs
+        .where('checkIn', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('checkIn', isLessThan: Timestamp.fromDate(end))
+        .orderBy('checkIn', descending: true)
+        .snapshots();
+  }
+
   // Get today's check-ins (filter on client side to avoid composite index)
-  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> getTodayCheckIns() async {
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  getTodayCheckIns() async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    
+
     // Get all recent logs and filter on client side to avoid composite index
     final snapshot = await _logs
         .orderBy('checkIn', descending: true)
         .limit(100)
         .get();
-    
+
     // Filter on client side for today's check-ins
     return snapshot.docs.where((doc) {
       final checkIn = (doc.data()['checkIn'] as Timestamp?)?.toDate();
@@ -53,17 +75,26 @@ class AttendanceRepository {
     required String ssid,
     required String bssid,
   }) async {
-    // Verify WiFi network
-    final isValid = await _wifiRepo.verifyWifiNetwork(
-      ssid: ssid,
-      bssid: bssid,
-    );
+    // Explicitly reject empty or 'manual' credentials to prevent bypass
+    if (ssid.trim().isEmpty ||
+        bssid.trim().isEmpty ||
+        ssid.toLowerCase() == 'manual' ||
+        bssid.toLowerCase() == 'manual') {
+      throw Exception(
+        'Check-in ditolak: Informasi WiFi tidak valid atau tidak terbaca.\n'
+        'Pastikan GPS dan WiFi aktif.',
+      );
+    }
+
+    // Verify WiFi network against admin list
+    final isValid = await _wifiRepo.verifyWifiNetwork(ssid: ssid, bssid: bssid);
 
     if (!isValid) {
       throw Exception(
-          'Check-in ditolak: Perangkat tidak terhubung ke WiFi kantor yang terdaftar.\n'
-          'SSID: $ssid\n'
-          'BSSID: $bssid');
+        'Check-in ditolak: Perangkat tidak terhubung ke WiFi kantor yang terdaftar.\n'
+        'SSID: $ssid\n'
+        'BSSID: ${bssid.toUpperCase()}',
+      );
     }
 
     await _logs.add({
@@ -82,7 +113,6 @@ class AttendanceRepository {
     final open = await _logs
         .where('userId', isEqualTo: userId)
         .where('checkOut', isNull: true)
-        .orderBy('checkIn', descending: true)
         .limit(1)
         .get();
     if (open.docs.isEmpty) {
@@ -144,9 +174,3 @@ final attendanceRepositoryProvider = Provider<AttendanceRepository>((ref) {
     ref.watch(wifiNetworkRepositoryProvider),
   );
 });
-
-
-
-
-
-

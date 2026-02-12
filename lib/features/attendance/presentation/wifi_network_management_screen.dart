@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../../../core/widgets/app_background.dart';
 import '../application/wifi_network_controller.dart';
 import '../data/wifi_network_repository.dart';
@@ -74,7 +75,8 @@ class _WifiNetworkManagementScreenState
                     }
                     // Basic BSSID format validation (MAC address format)
                     final bssidPattern = RegExp(
-                        r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$');
+                      r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$',
+                    );
                     if (!bssidPattern.hasMatch(value.trim())) {
                       return 'Format BSSID tidak valid (gunakan format MAC: aa:bb:cc:dd:ee:ff)';
                     }
@@ -111,15 +113,14 @@ class _WifiNetworkManagementScreenState
                             .addNetwork(
                               ssid: _ssidController.text.trim(),
                               bssid: _bssidController.text.trim(),
-                              description: _descriptionController.text
-                                  .trim()
-                                  .isEmpty
+                              description:
+                                  _descriptionController.text.trim().isEmpty
                                   ? null
                                   : _descriptionController.text.trim(),
                             );
 
                         if (!mounted) return;
-                        
+
                         // Check if there's an error in the state
                         final state = ref.read(wifiNetworkControllerProvider);
                         if (state.hasError) {
@@ -130,14 +131,17 @@ class _WifiNetworkManagementScreenState
                           Navigator.of(context).pop();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                                content: Text('WiFi network berhasil ditambahkan')),
+                              content: Text(
+                                'WiFi network berhasil ditambahkan',
+                              ),
+                            ),
                           );
                         }
                       } catch (e) {
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
-                          );
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('Error: $e')));
                         }
                       } finally {
                         if (mounted) {
@@ -189,12 +193,12 @@ class _WifiNetworkManagementScreenState
             .deleteNetwork(networkId);
 
         if (!mounted) return;
-        
+
         final state = ref.read(wifiNetworkControllerProvider);
         if (state.hasError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${state.error}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: ${state.error}')));
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('WiFi network berhasil dihapus')),
@@ -202,31 +206,31 @@ class _WifiNetworkManagementScreenState
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: $e')));
         }
       }
     }
   }
 
-  Widget _buildNetworkCard(QueryDocumentSnapshot<Map<String, dynamic>> doc, TextTheme textTheme) {
+  Widget _buildNetworkCard(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+    TextTheme textTheme,
+  ) {
     try {
       final data = doc.data();
       if (data.isEmpty) {
         return const SizedBox.shrink();
       }
-      
+
       final network = WifiNetworkModel.fromMap(doc.id, data);
 
       return Card(
         child: ListTile(
           leading: CircleAvatar(
             backgroundColor: AppColors.accent.withOpacity(0.15),
-            child: const Icon(
-              Icons.wifi,
-              color: AppColors.accent,
-            ),
+            child: const Icon(Icons.wifi, color: AppColors.accent),
           ),
           title: Text(
             network.ssid.isNotEmpty ? network.ssid : 'Unknown',
@@ -244,14 +248,11 @@ class _WifiNetworkManagementScreenState
               ],
             ],
           ),
-          isThreeLine: network.description != null &&
-              network.description!.isNotEmpty,
+          isThreeLine:
+              network.description != null && network.description!.isNotEmpty,
           trailing: IconButton(
             icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () => _deleteNetwork(
-              network.id,
-              network.ssid,
-            ),
+            onPressed: () => _deleteNetwork(network.id, network.ssid),
             tooltip: 'Hapus',
           ),
         ),
@@ -288,195 +289,209 @@ class _WifiNetworkManagementScreenState
         ),
         title: const Text('Kelola WiFi Networks'),
       ),
-      body: SafeArea(
-        child: AppBackground(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final button = ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        maxWidth: 190, // cegah Row memberi lebar tak hingga di web
-                        minHeight: 40,
-                      ),
-                      child: ElevatedButton.icon(
-                        onPressed: _showAddDialog,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Tambah WiFi'),
-                      ),
-                    );
+      body: AnimatedPage(
+        child: SafeArea(
+          child: AppBackground(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final button = ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth:
+                              190, // cegah Row memberi lebar tak hingga di web
+                          minHeight: 40,
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: _showAddDialog,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Tambah WiFi'),
+                        ),
+                      );
 
-                    // Jika ruang sempit (misal mobile), jadikan kolom agar tidak memaksa lebar tak hingga.
-                    if (constraints.maxWidth < 400) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                      // Jika ruang sempit (misal mobile), jadikan kolom agar tidak memaksa lebar tak hingga.
+                      if (constraints.maxWidth < 400) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'WiFi Networks Terdaftar',
+                              style: textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : null,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: button,
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
                         children: [
-                          Text(
-                            'WiFi Networks Terdaftar',
-                            style: textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : null,
+                          Expanded(
+                            child: Text(
+                              'WiFi Networks Terdaftar',
+                              style: textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : null,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: button,
-                          ),
+                          button,
                         ],
                       );
-                    }
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: wifiRepo.streamAllNetworks(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'WiFi Networks Terdaftar',
-                            style: textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : null,
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 64,
+                                  color: Colors.red,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Error: ${snapshot.error}',
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    color: Colors.red,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: () => setState(() {}),
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Refresh'),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                        button,
-                      ],
-                    );
-                  },
-                ),
-              ),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: wifiRepo.streamAllNetworks(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                        );
+                      }
 
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 64,
-                                color: Colors.red,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Error: ${snapshot.error}',
-                                style: textTheme.bodyLarge?.copyWith(
+                      final docs = snapshot.data?.docs ?? [];
+
+                      late final List<
+                        QueryDocumentSnapshot<Map<String, dynamic>>
+                      >
+                      sortedDocs;
+                      try {
+                        sortedDocs = docs.toList()
+                          ..sort((a, b) {
+                            final aSsid = (a.data()['ssid'] ?? '').toString();
+                            final bSsid = (b.data()['ssid'] ?? '').toString();
+                            return aSsid.compareTo(bSsid);
+                          });
+                      } catch (e) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 64,
                                   color: Colors.red,
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () => setState(() {}),
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Refresh'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-
-                    final docs = snapshot.data?.docs ?? [];
-
-                    late final List<QueryDocumentSnapshot<Map<String, dynamic>>> sortedDocs;
-                    try {
-                      sortedDocs = docs.toList()
-                        ..sort((a, b) {
-                          final aSsid = (a.data()['ssid'] ?? '').toString();
-                          final bSsid = (b.data()['ssid'] ?? '').toString();
-                          return aSsid.compareTo(bSsid);
-                        });
-                    } catch (e) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 64,
-                                color: Colors.red,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Gagal memuat data WiFi: $e',
-                                style: textTheme.bodyLarge?.copyWith(
-                                  color: Colors.red,
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Gagal memuat data WiFi: $e',
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    color: Colors.red,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () => setState(() {}),
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Coba Lagi'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-
-                    if (sortedDocs.isEmpty) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.wifi_off,
-                                size: 64,
-                                color: isDark ? Colors.white54 : Colors.black54,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Belum ada WiFi network terdaftar',
-                                style: textTheme.bodyLarge?.copyWith(
-                                  color: isDark ? Colors.white70 : Colors.black87,
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: () => setState(() {}),
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Coba Lagi'),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Tambahkan WiFi network kantor untuk sistem absensi berbasis WiFi',
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: isDark ? Colors.white54 : Colors.black54,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    }
+                        );
+                      }
 
-                    return ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: sortedDocs.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        return _buildNetworkCard(sortedDocs[index], textTheme);
-                      },
-                    );
-                  },
+                      if (sortedDocs.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.wifi_off,
+                                  size: 64,
+                                  color: isDark
+                                      ? Colors.white54
+                                      : Colors.black54,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Belum ada WiFi network terdaftar',
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tambahkan WiFi network kantor untuk sistem absensi berbasis WiFi',
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: isDark
+                                        ? Colors.white54
+                                        : Colors.black54,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: sortedDocs.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          return _buildNetworkCard(
+                            sortedDocs[index],
+                            textTheme,
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-

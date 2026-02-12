@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../../../core/widgets/app_background.dart';
 import '../../auth/data/user_providers.dart';
 import '../application/leave_controller.dart';
@@ -16,7 +17,8 @@ class LeaveInboxScreen extends ConsumerStatefulWidget {
   ConsumerState<LeaveInboxScreen> createState() => _LeaveInboxScreenState();
 }
 
-class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen> with SingleTickerProviderStateMixin {
+class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _selectedFilter = 'Semua'; // Semua, Menunggu, Diterima, Ditolak
 
@@ -54,7 +56,7 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen> with Single
 
   Future<void> _handleApprove(String leaveId, String employeeName) async {
     final adminNotesController = TextEditingController();
-    
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -94,7 +96,9 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen> with Single
 
     if (result == true && mounted) {
       try {
-        await ref.read(leaveControllerProvider.notifier).approveLeave(
+        await ref
+            .read(leaveControllerProvider.notifier)
+            .approveLeave(
               leaveId: leaveId,
               adminNotes: adminNotesController.text.trim().isEmpty
                   ? null
@@ -122,10 +126,7 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen> with Single
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -174,7 +175,9 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen> with Single
 
     if (result == true && mounted) {
       try {
-        await ref.read(leaveControllerProvider.notifier).rejectLeave(
+        await ref
+            .read(leaveControllerProvider.notifier)
+            .rejectLeave(
               leaveId: leaveId,
               adminNotes: adminNotesController.text.trim().isEmpty
                   ? null
@@ -202,10 +205,7 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen> with Single
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -306,13 +306,12 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen> with Single
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+                      color: isDark
+                          ? Colors.grey.shade800
+                          : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      notes,
-                      style: textTheme.bodyMedium,
-                    ),
+                    child: Text(notes, style: textTheme.bodyMedium),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -398,9 +397,7 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen> with Single
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Menunggu'),
-                ],
+                children: [Text('Menunggu')],
               ),
             ),
             Tab(text: 'Diterima'),
@@ -408,165 +405,173 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen> with Single
           ],
         ),
       ),
-      body: AppBackground(
-        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: ref.watch(usersCollectionProvider).snapshots(),
-          builder: (context, usersSnapshot) {
-            final userDocs = usersSnapshot.data?.docs ?? [];
-            final Map<String, String> userNameById = {
-              for (final doc in userDocs)
-                doc.id: (doc.data()['name'] ?? doc.id).toString(),
-            };
+      body: AnimatedPage(
+        child: AppBackground(
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: ref.watch(usersCollectionProvider).snapshots(),
+            builder: (context, usersSnapshot) {
+              final userDocs = usersSnapshot.data?.docs ?? [];
+              final Map<String, String> userNameById = {
+                for (final doc in userDocs)
+                  doc.id: (doc.data()['name'] ?? doc.id).toString(),
+              };
 
-            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: leavesStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: leavesStream,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 64,
-                            color: Colors.red,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Error: ${snapshot.error}',
-                            style: textTheme.bodyLarge?.copyWith(
-                              color: Colors.red,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                final docs = snapshot.data?.docs ?? [];
-
-                // Filter by status if needed (for Semua tab, show all)
-                final filteredDocs = _selectedFilter == 'Semua'
-                    ? docs
-                    : docs.where((doc) {
-                        final status = doc.data()['status'] as String? ?? 'Menunggu';
-                        return status == _selectedFilter;
-                      }).toList();
-                
-                // Note: For tabs other than "Semua", filtering is already done in the stream query
-                // But we keep this as a safety filter
-
-                // Sort by createdAt descending on client side
-                filteredDocs.sort((a, b) {
-                  final aTime = (a.data()['createdAt'] as Timestamp?)?.toDate();
-                  final bTime = (b.data()['createdAt'] as Timestamp?)?.toDate();
-                  if (aTime == null && bTime == null) return 0;
-                  if (aTime == null) return 1;
-                  if (bTime == null) return -1;
-                  return bTime.compareTo(aTime); // Descending
-                });
-
-                if (filteredDocs.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _selectedFilter == 'Menunggu'
-                                ? Icons.inbox_outlined
-                                : Icons.event_busy,
-                            size: 64,
-                            color: isDark ? Colors.white54 : Colors.black54,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _selectedFilter == 'Semua'
-                                ? 'Belum ada permohonan cuti'
-                                : 'Tidak ada permohonan dengan status "$_selectedFilter"',
-                            style: textTheme.bodyLarge?.copyWith(
-                              color: isDark ? Colors.white70 : Colors.black87,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                return ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    // Summary card
-                    Card(
-                      color: _selectedFilter == 'Menunggu'
-                          ? Colors.orange.withOpacity(0.1)
-                          : AppColors.accent.withOpacity(0.1),
+                  if (snapshot.hasError) {
+                    return Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              _selectedFilter == 'Menunggu'
-                                  ? Icons.pending_actions
-                                  : Icons.inbox,
-                              color: _selectedFilter == 'Menunggu'
-                                  ? Colors.orange
-                                  : AppColors.accent,
-                              size: 32,
+                              Icons.error_outline,
+                              size: 64,
+                              color: Colors.red,
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Total: ${filteredDocs.length}',
-                                    style: textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark ? Colors.white : null,
-                                    ),
-                                  ),
-                                  if (_selectedFilter == 'Menunggu')
-                                    Text(
-                                      '${filteredDocs.length} permohonan menunggu persetujuan',
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: isDark ? Colors.white70 : Colors.black87,
-                                      ),
-                                    ),
-                                ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error: ${snapshot.error}',
+                              style: textTheme.bodyLarge?.copyWith(
+                                color: Colors.red,
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    ...filteredDocs.map((doc) => _buildLeaveCard(
+                    );
+                  }
+
+                  final docs = snapshot.data?.docs ?? [];
+
+                  // Filter by status if needed (for Semua tab, show all)
+                  final filteredDocs = _selectedFilter == 'Semua'
+                      ? docs
+                      : docs.where((doc) {
+                          final status =
+                              doc.data()['status'] as String? ?? 'Menunggu';
+                          return status == _selectedFilter;
+                        }).toList();
+
+                  // Note: For tabs other than "Semua", filtering is already done in the stream query
+                  // But we keep this as a safety filter
+
+                  // Sort by createdAt descending on client side
+                  filteredDocs.sort((a, b) {
+                    final aTime = (a.data()['createdAt'] as Timestamp?)
+                        ?.toDate();
+                    final bTime = (b.data()['createdAt'] as Timestamp?)
+                        ?.toDate();
+                    if (aTime == null && bTime == null) return 0;
+                    if (aTime == null) return 1;
+                    if (bTime == null) return -1;
+                    return bTime.compareTo(aTime); // Descending
+                  });
+
+                  if (filteredDocs.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _selectedFilter == 'Menunggu'
+                                  ? Icons.inbox_outlined
+                                  : Icons.event_busy,
+                              size: 64,
+                              color: isDark ? Colors.white54 : Colors.black54,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _selectedFilter == 'Semua'
+                                  ? 'Belum ada permohonan cuti'
+                                  : 'Tidak ada permohonan dengan status "$_selectedFilter"',
+                              style: textTheme.bodyLarge?.copyWith(
+                                color: isDark ? Colors.white70 : Colors.black87,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      // Summary card
+                      Card(
+                        color: _selectedFilter == 'Menunggu'
+                            ? Colors.orange.withOpacity(0.1)
+                            : AppColors.accent.withOpacity(0.1),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _selectedFilter == 'Menunggu'
+                                    ? Icons.pending_actions
+                                    : Icons.inbox,
+                                color: _selectedFilter == 'Menunggu'
+                                    ? Colors.orange
+                                    : AppColors.accent,
+                                size: 32,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Total: ${filteredDocs.length}',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? Colors.white : null,
+                                      ),
+                                    ),
+                                    if (_selectedFilter == 'Menunggu')
+                                      Text(
+                                        '${filteredDocs.length} permohonan menunggu persetujuan',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: isDark
+                                              ? Colors.white70
+                                              : Colors.black87,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ...filteredDocs.map(
+                        (doc) => _buildLeaveCard(
                           context,
                           doc,
                           userNameById,
                           textTheme,
                           isDark,
-                        )),
-                  ],
-                );
-              },
-            );
-          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
-

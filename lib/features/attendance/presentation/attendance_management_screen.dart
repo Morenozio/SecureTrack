@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../data/attendance_repository.dart';
 import '../../auth/data/user_providers.dart';
 
@@ -56,323 +57,331 @@ class _AttendanceManagementScreenState
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // ─── Filter Bar ───
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : Colors.white,
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark
-                      ? AppColors.primary.withOpacity(0.1)
-                      : Colors.grey.shade200,
+      body: AnimatedPage(
+        child: Column(
+          children: [
+            // ─── Filter Bar ───
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : Colors.white,
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark
+                        ? AppColors.primary.withOpacity(0.1)
+                        : Colors.grey.shade200,
+                  ),
                 ),
               ),
-            ),
-            child: Column(
-              children: [
-                // Date picker row
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _pickDate(context),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppColors.backgroundDark
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isDark
-                              ? AppColors.primary.withOpacity(0.1)
-                              : Colors.transparent,
+              child: Column(
+                children: [
+                  // Date picker row
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _pickDate(context),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            size: 18,
-                            color: AppColors.primary,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppColors.backgroundDark
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isDark
+                                ? AppColors.primary.withOpacity(0.1)
+                                : Colors.transparent,
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            DateFormat(
-                              'EEEE, MMM dd, yyyy',
-                            ).format(_selectedDate),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              size: 18,
+                              color: AppColors.primary,
                             ),
-                          ),
-                          const Spacer(),
-                          Icon(
-                            Icons.chevron_right,
-                            size: 20,
-                            color: Colors.grey.shade400,
-                          ),
-                        ],
+                            const SizedBox(width: 10),
+                            Text(
+                              DateFormat(
+                                'EEEE, MMM dd, yyyy',
+                              ).format(_selectedDate),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 20,
+                              color: Colors.grey.shade400,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Department + Status row
-                Row(
-                  children: [
-                    // Department
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: employeesStream,
-                        builder: (context, snap) {
-                          final departments = <String>{'All'};
-                          if (snap.hasData) {
-                            for (final doc in snap.data!.docs) {
-                              final dept = doc.data()['department'] as String?;
-                              if (dept != null && dept.isNotEmpty) {
-                                departments.add(dept);
-                              }
-                            }
-                          }
-                          return _FilterDropdown(
-                            value: _departmentFilter,
-                            items: departments.toList(),
-                            prefix: 'Dept: ',
-                            isDark: isDark,
-                            onChanged: (v) =>
-                                setState(() => _departmentFilter = v ?? 'All'),
-                          );
-                        },
+                  const SizedBox(height: 12),
+                  // Department + Status row
+                  Row(
+                    children: [
+                      // Department
+                      Expanded(
+                        child:
+                            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                              stream: employeesStream,
+                              builder: (context, snap) {
+                                final departments = <String>{'All'};
+                                if (snap.hasData) {
+                                  for (final doc in snap.data!.docs) {
+                                    final dept =
+                                        doc.data()['department'] as String?;
+                                    if (dept != null && dept.isNotEmpty) {
+                                      departments.add(dept);
+                                    }
+                                  }
+                                }
+                                return _FilterDropdown(
+                                  value: _departmentFilter,
+                                  items: departments.toList(),
+                                  prefix: 'Dept: ',
+                                  isDark: isDark,
+                                  onChanged: (v) => setState(
+                                    () => _departmentFilter = v ?? 'All',
+                                  ),
+                                );
+                              },
+                            ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Status
-                    Expanded(
-                      child: _FilterDropdown(
-                        value: _statusFilter,
-                        items: const [
-                          'All',
-                          'Present',
-                          'Late',
-                          'Absent',
-                          'On Leave',
-                        ],
-                        prefix: 'Status: ',
-                        isDark: isDark,
-                        onChanged: (v) =>
-                            setState(() => _statusFilter = v ?? 'All'),
+                      const SizedBox(width: 12),
+                      // Status
+                      Expanded(
+                        child: _FilterDropdown(
+                          value: _statusFilter,
+                          items: const [
+                            'All',
+                            'Present',
+                            'Late',
+                            'Absent',
+                            'On Leave',
+                          ],
+                          prefix: 'Status: ',
+                          isDark: isDark,
+                          onChanged: (v) =>
+                              setState(() => _statusFilter = v ?? 'All'),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // ─── Attendance Table ───
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: employeesStream,
-              builder: (context, empSnapshot) {
-                if (empSnapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            // ─── Attendance Table ───
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: employeesStream,
+                builder: (context, empSnapshot) {
+                  if (empSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                final employees = empSnapshot.data?.docs ?? [];
+                  final employees = empSnapshot.data?.docs ?? [];
 
-                // Filter by department
-                final filteredEmployees = _departmentFilter == 'All'
-                    ? employees
-                    : employees.where((d) {
-                        return d.data()['department'] == _departmentFilter;
-                      }).toList();
+                  // Filter by department
+                  final filteredEmployees = _departmentFilter == 'All'
+                      ? employees
+                      : employees.where((d) {
+                          return d.data()['department'] == _departmentFilter;
+                        }).toList();
 
-                if (filteredEmployees.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No employees found',
-                      style: TextStyle(
-                        color: isDark
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
+                  if (filteredEmployees.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No employees found',
+                        style: TextStyle(
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
+                        ),
                       ),
-                    ),
-                  );
-                }
-
-                return FutureBuilder<
-                  List<QueryDocumentSnapshot<Map<String, dynamic>>>
-                >(
-                  future: attendanceRepo.getTodayCheckIns(),
-                  builder: (context, checkInSnap) {
-                    final todayLogs = checkInSnap.data ?? [];
-
-                    // Build a map of userId → attendance data
-                    final Map<String, Map<String, dynamic>> attendanceByUser =
-                        {};
-                    for (final log in todayLogs) {
-                      final data = log.data();
-                      final userId = data['userId'] as String?;
-                      final checkIn = (data['checkIn'] as Timestamp?)?.toDate();
-                      if (userId != null && checkIn != null) {
-                        // Only include logs for selected date
-                        if (checkIn.year == _selectedDate.year &&
-                            checkIn.month == _selectedDate.month &&
-                            checkIn.day == _selectedDate.day) {
-                          attendanceByUser[userId] = data;
-                        }
-                      }
-                    }
-
-                    // Build rows
-                    final rows = <_AttendanceRow>[];
-                    for (final emp in filteredEmployees) {
-                      final empData = emp.data();
-                      final userId = emp.id;
-                      final name = empData['name'] as String? ?? '-';
-                      final dept = empData['department'] as String? ?? '';
-                      final att = attendanceByUser[userId];
-
-                      String status;
-                      DateTime? checkIn;
-                      DateTime? checkOut;
-
-                      if (att != null) {
-                        checkIn = (att['checkIn'] as Timestamp?)?.toDate();
-                        checkOut = (att['checkOut'] as Timestamp?)?.toDate();
-                        if (checkIn != null &&
-                            checkIn.hour >= 9 &&
-                            checkIn.minute > 0) {
-                          status = 'Late';
-                        } else {
-                          status = 'Present';
-                        }
-                      } else {
-                        status = 'Absent';
-                      }
-
-                      // Check if on leave
-                      // (simplified — checks leave collection)
-                      // For now just use attendance data
-
-                      rows.add(
-                        _AttendanceRow(
-                          userId: userId,
-                          name: name,
-                          department: dept,
-                          status: status,
-                          checkIn: checkIn,
-                          checkOut: checkOut,
-                        ),
-                      );
-                    }
-
-                    // Apply status filter
-                    final displayRows = _statusFilter == 'All'
-                        ? rows
-                        : rows.where((r) => r.status == _statusFilter).toList();
-
-                    // Count summary
-                    final presentCount = rows
-                        .where((r) => r.status == 'Present')
-                        .length;
-                    final lateCount = rows
-                        .where((r) => r.status == 'Late')
-                        .length;
-                    final absentCount = rows
-                        .where((r) => r.status == 'Absent')
-                        .length;
-
-                    return Column(
-                      children: [
-                        // Summary bar
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            children: [
-                              _SummaryChip(
-                                label: 'Present',
-                                count: presentCount,
-                                color: AppColors.success,
-                                isDark: isDark,
-                              ),
-                              const SizedBox(width: 8),
-                              _SummaryChip(
-                                label: 'Late',
-                                count: lateCount,
-                                color: AppColors.warning,
-                                isDark: isDark,
-                              ),
-                              const SizedBox(width: 8),
-                              _SummaryChip(
-                                label: 'Absent',
-                                count: absentCount,
-                                color: AppColors.danger,
-                                isDark: isDark,
-                              ),
-                              const Spacer(),
-                              Text(
-                                '${displayRows.length} shown',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // List
-                        Expanded(
-                          child: displayRows.isEmpty
-                              ? Center(
-                                  child: Text(
-                                    'No records match filter',
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.grey.shade400
-                                          : Colors.grey.shade600,
-                                    ),
-                                  ),
-                                )
-                              : ListView.separated(
-                                  physics: const BouncingScrollPhysics(),
-                                  cacheExtent: 1000,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                  ),
-                                  itemCount: displayRows.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(height: 8),
-                                  itemBuilder: (context, index) {
-                                    final row = displayRows[index];
-                                    return _AttendanceRowCard(
-                                      row: row,
-                                      isDark: isDark,
-                                      onTap: () => context.push(
-                                        '/admin/employee-attendance/${row.userId}?name=${Uri.encodeComponent(row.name)}',
-                                      ),
-                                    );
-                                  },
-                                ),
-                        ),
-                      ],
                     );
-                  },
-                );
-              },
+                  }
+
+                  return FutureBuilder<
+                    List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                  >(
+                    future: attendanceRepo.getTodayCheckIns(),
+                    builder: (context, checkInSnap) {
+                      final todayLogs = checkInSnap.data ?? [];
+
+                      // Build a map of userId → attendance data
+                      final Map<String, Map<String, dynamic>> attendanceByUser =
+                          {};
+                      for (final log in todayLogs) {
+                        final data = log.data();
+                        final userId = data['userId'] as String?;
+                        final checkIn = (data['checkIn'] as Timestamp?)
+                            ?.toDate();
+                        if (userId != null && checkIn != null) {
+                          // Only include logs for selected date
+                          if (checkIn.year == _selectedDate.year &&
+                              checkIn.month == _selectedDate.month &&
+                              checkIn.day == _selectedDate.day) {
+                            attendanceByUser[userId] = data;
+                          }
+                        }
+                      }
+
+                      // Build rows
+                      final rows = <_AttendanceRow>[];
+                      for (final emp in filteredEmployees) {
+                        final empData = emp.data();
+                        final userId = emp.id;
+                        final name = empData['name'] as String? ?? '-';
+                        final dept = empData['department'] as String? ?? '';
+                        final att = attendanceByUser[userId];
+
+                        String status;
+                        DateTime? checkIn;
+                        DateTime? checkOut;
+
+                        if (att != null) {
+                          checkIn = (att['checkIn'] as Timestamp?)?.toDate();
+                          checkOut = (att['checkOut'] as Timestamp?)?.toDate();
+                          if (checkIn != null &&
+                              checkIn.hour >= 9 &&
+                              checkIn.minute > 0) {
+                            status = 'Late';
+                          } else {
+                            status = 'Present';
+                          }
+                        } else {
+                          status = 'Absent';
+                        }
+
+                        // Check if on leave
+                        // (simplified — checks leave collection)
+                        // For now just use attendance data
+
+                        rows.add(
+                          _AttendanceRow(
+                            userId: userId,
+                            name: name,
+                            department: dept,
+                            status: status,
+                            checkIn: checkIn,
+                            checkOut: checkOut,
+                          ),
+                        );
+                      }
+
+                      // Apply status filter
+                      final displayRows = _statusFilter == 'All'
+                          ? rows
+                          : rows
+                                .where((r) => r.status == _statusFilter)
+                                .toList();
+
+                      // Count summary
+                      final presentCount = rows
+                          .where((r) => r.status == 'Present')
+                          .length;
+                      final lateCount = rows
+                          .where((r) => r.status == 'Late')
+                          .length;
+                      final absentCount = rows
+                          .where((r) => r.status == 'Absent')
+                          .length;
+
+                      return Column(
+                        children: [
+                          // Summary bar
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            child: Row(
+                              children: [
+                                _SummaryChip(
+                                  label: 'Present',
+                                  count: presentCount,
+                                  color: AppColors.success,
+                                  isDark: isDark,
+                                ),
+                                const SizedBox(width: 8),
+                                _SummaryChip(
+                                  label: 'Late',
+                                  count: lateCount,
+                                  color: AppColors.warning,
+                                  isDark: isDark,
+                                ),
+                                const SizedBox(width: 8),
+                                _SummaryChip(
+                                  label: 'Absent',
+                                  count: absentCount,
+                                  color: AppColors.danger,
+                                  isDark: isDark,
+                                ),
+                                const Spacer(),
+                                Text(
+                                  '${displayRows.length} shown',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // List
+                          Expanded(
+                            child: displayRows.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      'No records match filter',
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? Colors.grey.shade400
+                                            : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    physics: const BouncingScrollPhysics(),
+                                    cacheExtent: 1000,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    itemCount: displayRows.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 8),
+                                    itemBuilder: (context, index) {
+                                      final row = displayRows[index];
+                                      return _AttendanceRowCard(
+                                        row: row,
+                                        isDark: isDark,
+                                        onTap: () => context.push(
+                                          '/admin/employee-attendance/${row.userId}?name=${Uri.encodeComponent(row.name)}',
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

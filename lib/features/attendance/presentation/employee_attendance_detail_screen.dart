@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../../../core/widgets/app_background.dart';
 import '../data/attendance_repository.dart';
 import '../../auth/data/user_providers.dart';
@@ -49,18 +50,19 @@ class _EmployeeAttendanceDetailScreenState
     return b.difference(a);
   }
 
-  Future<void> _editLog(
-    String logId,
-    Map<String, dynamic> data,
-  ) async {
+  Future<void> _editLog(String logId, Map<String, dynamic> data) async {
     final checkIn = (data['checkIn'] as Timestamp?)?.toDate();
     final checkOut = (data['checkOut'] as Timestamp?)?.toDate();
     final ssid = data['wifiSsid'] as String?;
     final bssid = data['wifiBssid'] as String?;
     final status = data['status'] as String?;
 
-    final checkInCtrl = TextEditingController(text: checkIn?.toIso8601String() ?? '');
-    final checkOutCtrl = TextEditingController(text: checkOut?.toIso8601String() ?? '');
+    final checkInCtrl = TextEditingController(
+      text: checkIn?.toIso8601String() ?? '',
+    );
+    final checkOutCtrl = TextEditingController(
+      text: checkOut?.toIso8601String() ?? '',
+    );
     final ssidCtrl = TextEditingController(text: ssid ?? '');
     final bssidCtrl = TextEditingController(text: bssid ?? '');
     String? selectedStatus = status;
@@ -99,7 +101,9 @@ class _EmployeeAttendanceDetailScreenState
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: selectedStatus,
-                decoration: const InputDecoration(labelText: 'Status Kehadiran'),
+                decoration: const InputDecoration(
+                  labelText: 'Status Kehadiran',
+                ),
                 items: const [
                   DropdownMenuItem(value: 'hadir', child: Text('Hadir')),
                   DropdownMenuItem(value: 'telat', child: Text('Telat')),
@@ -135,34 +139,52 @@ class _EmployeeAttendanceDetailScreenState
                   : DateTime.tryParse(checkOutCtrl.text.trim());
               if (checkInCtrl.text.trim().isNotEmpty && ci == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Format check-in tidak valid'), backgroundColor: Colors.red),
+                  const SnackBar(
+                    content: Text('Format check-in tidak valid'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
                 return;
               }
               if (checkOutCtrl.text.trim().isNotEmpty && co == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Format check-out tidak valid'), backgroundColor: Colors.red),
+                  const SnackBar(
+                    content: Text('Format check-out tidak valid'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
                 return;
               }
               setState(() => _isSaving = true);
               try {
-                await ref.read(attendanceRepositoryProvider).updateLog(
+                await ref
+                    .read(attendanceRepositoryProvider)
+                    .updateLog(
                       logId: logId,
                       checkIn: ci,
                       checkOut: co,
-                      ssid: ssidCtrl.text.trim().isEmpty ? null : ssidCtrl.text.trim(),
-                      bssid: bssidCtrl.text.trim().isEmpty ? null : bssidCtrl.text.trim(),
+                      ssid: ssidCtrl.text.trim().isEmpty
+                          ? null
+                          : ssidCtrl.text.trim(),
+                      bssid: bssidCtrl.text.trim().isEmpty
+                          ? null
+                          : bssidCtrl.text.trim(),
                       status: selectedStatus,
                     );
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Absensi diperbarui'), backgroundColor: Colors.green),
+                  const SnackBar(
+                    content: Text('Absensi diperbarui'),
+                    backgroundColor: Colors.green,
+                  ),
                 );
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               } finally {
@@ -219,7 +241,9 @@ class _EmployeeAttendanceDetailScreenState
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: status,
-                decoration: const InputDecoration(labelText: 'Status Kehadiran'),
+                decoration: const InputDecoration(
+                  labelText: 'Status Kehadiran',
+                ),
                 items: const [
                   DropdownMenuItem(value: 'hadir', child: Text('Hadir')),
                   DropdownMenuItem(value: 'telat', child: Text('Telat')),
@@ -251,7 +275,10 @@ class _EmployeeAttendanceDetailScreenState
                   : DateTime.tryParse(checkOutCtrl.text.trim());
               if (checkIn == null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Check-in wajib dan harus valid'), backgroundColor: Colors.red),
+                  const SnackBar(
+                    content: Text('Check-in wajib dan harus valid'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
                 return;
               }
@@ -266,7 +293,9 @@ class _EmployeeAttendanceDetailScreenState
     if (checkIn == null) return;
     setState(() => _isSaving = true);
     try {
-      await ref.read(attendanceRepositoryProvider).addManualLog(
+      await ref
+          .read(attendanceRepositoryProvider)
+          .addManualLog(
             userId: widget.userId,
             checkIn: checkIn!,
             checkOut: checkOut,
@@ -276,7 +305,10 @@ class _EmployeeAttendanceDetailScreenState
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Log manual ditambahkan'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Log manual ditambahkan'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       if (mounted) {
@@ -289,10 +321,15 @@ class _EmployeeAttendanceDetailScreenState
     }
   }
 
-  Future<void> _exportCsv(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) async {
+  Future<void> _exportCsv(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
     if (docs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data kosong'), backgroundColor: Colors.orange),
+        const SnackBar(
+          content: Text('Data kosong'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
@@ -324,7 +361,9 @@ class _EmployeeAttendanceDetailScreenState
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('CSV disalin ke clipboard (silakan tempel di Excel/Sheets)'),
+        content: Text(
+          'CSV disalin ke clipboard (silakan tempel di Excel/Sheets)',
+        ),
         backgroundColor: Colors.green,
       ),
     );
@@ -354,108 +393,130 @@ class _EmployeeAttendanceDetailScreenState
         icon: const Icon(Icons.add),
         label: const Text('Tambah manual'),
       ),
-      body: AppBackground(
-        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _logsStream(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const LinearProgressIndicator();
-            }
-            final docs = snapshot.data?.docs ?? [];
-            if (docs.isEmpty) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.history, size: 64, color: isDark ? Colors.white54 : Colors.black54),
-                      const SizedBox(height: 12),
-                      const Text('Belum ada data absensi'),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        onPressed: _addManualLog,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Tambah manual'),
-                      )
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            return Column(
-              children: [
-                if (_isSaving) const LinearProgressIndicator(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Text('Total log: ${docs.length}', style: textTheme.bodyMedium),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: () => _exportCsv(docs),
-                        icon: const Icon(Icons.file_download),
-                        label: const Text('Export CSV'),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: docs.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final data = docs[index].data();
-                      final logId = docs[index].id;
-                      final checkIn = (data['checkIn'] as Timestamp?)?.toDate();
-                      final checkOut = (data['checkOut'] as Timestamp?)?.toDate();
-                      final ssid = data['wifiSsid'] as String?;
-                      final bssid = data['wifiBssid'] as String?;
-                      final status = (data['status'] ?? '') as String;
-                      final duration = _duration(checkIn, checkOut);
-
-                      return Card(
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: AppColors.accent.withOpacity(0.15),
-                            child: const Icon(Icons.access_time, color: AppColors.accent),
-                          ),
-                          title: Text(
-                            _formatDateTime(checkIn),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text('Check-out: ${_formatDateTime(checkOut)}'),
-                              if (ssid != null && ssid.isNotEmpty) Text('SSID: $ssid'),
-                              if (bssid != null && bssid.isNotEmpty) Text('BSSID: $bssid'),
-                              Text(
-                                'Durasi: ${duration.inHours}h ${duration.inMinutes.remainder(60)}m',
-                              ),
-                              if (status.isNotEmpty) Text('Status: $status'),
-                            ],
-                          ),
-                          isThreeLine: true,
-                          trailing: IconButton(
-                            tooltip: 'Edit',
-                            onPressed: () => _editLog(logId, data),
-                            icon: const Icon(Icons.edit),
-                          ),
+      body: AnimatedPage(
+        child: AppBackground(
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: _logsStream(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const LinearProgressIndicator();
+              }
+              final docs = snapshot.data?.docs ?? [];
+              if (docs.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.history,
+                          size: 64,
+                          color: isDark ? Colors.white54 : Colors.black54,
                         ),
-                      );
-                    },
+                        const SizedBox(height: 12),
+                        const Text('Belum ada data absensi'),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: _addManualLog,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Tambah manual'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
+                );
+              }
+
+              return Column(
+                children: [
+                  if (_isSaving) const LinearProgressIndicator(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Total log: ${docs.length}',
+                          style: textTheme.bodyMedium,
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          onPressed: () => _exportCsv(docs),
+                          icon: const Icon(Icons.file_download),
+                          label: const Text('Export CSV'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: docs.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final data = docs[index].data();
+                        final logId = docs[index].id;
+                        final checkIn = (data['checkIn'] as Timestamp?)
+                            ?.toDate();
+                        final checkOut = (data['checkOut'] as Timestamp?)
+                            ?.toDate();
+                        final ssid = data['wifiSsid'] as String?;
+                        final bssid = data['wifiBssid'] as String?;
+                        final status = (data['status'] ?? '') as String;
+                        final duration = _duration(checkIn, checkOut);
+
+                        return Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: AppColors.accent.withOpacity(
+                                0.15,
+                              ),
+                              child: const Icon(
+                                Icons.access_time,
+                                color: AppColors.accent,
+                              ),
+                            ),
+                            title: Text(
+                              _formatDateTime(checkIn),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Text('Check-out: ${_formatDateTime(checkOut)}'),
+                                if (ssid != null && ssid.isNotEmpty)
+                                  Text('SSID: $ssid'),
+                                if (bssid != null && bssid.isNotEmpty)
+                                  Text('BSSID: $bssid'),
+                                Text(
+                                  'Durasi: ${duration.inHours}h ${duration.inMinutes.remainder(60)}m',
+                                ),
+                                if (status.isNotEmpty) Text('Status: $status'),
+                              ],
+                            ),
+                            isThreeLine: true,
+                            trailing: IconButton(
+                              tooltip: 'Edit',
+                              onPressed: () => _editLog(logId, data),
+                              icon: const Icon(Icons.edit),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
-

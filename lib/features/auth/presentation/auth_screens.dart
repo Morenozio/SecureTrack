@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/widgets/animated_page.dart';
 import '../application/auth_controller.dart';
 import '../data/user_providers.dart';
 
@@ -39,143 +40,149 @@ class _AuthChoiceScreenState extends ConsumerState<AuthChoiceScreen> {
           ),
         ],
       ),
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? [const Color(0xFF0A0F1F), AppColors.navyDark]
-                : [const Color(0xFFF3F6FF), Colors.white],
+      body: AnimatedPage(
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [const Color(0xFF0A0F1F), AppColors.navyDark]
+                  : [const Color(0xFFF3F6FF), Colors.white],
+            ),
           ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                              radius: 32,
-                              backgroundColor: isDark 
-                                  ? AppColors.accent.withOpacity(0.2) 
-                                  : AppColors.navy.withOpacity(0.1),
-                              child: Icon(
-                                Icons.verified_user, 
-                                color: isDark ? AppColors.accent : AppColors.navy, 
-                                size: 32,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Column(
+                            children: [
+                              CircleAvatar(
+                                radius: 32,
+                                backgroundColor: isDark
+                                    ? AppColors.accent.withOpacity(0.2)
+                                    : AppColors.navy.withOpacity(0.1),
+                                child: Icon(
+                                  Icons.verified_user,
+                                  color: isDark
+                                      ? AppColors.accent
+                                      : AppColors.navy,
+                                  size: 32,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'SecureTrack',
-                              style: textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : AppColors.navy,
+                              const SizedBox(height: 12),
+                              Text(
+                                'SecureTrack',
+                                style: textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : AppColors.navy,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Secure attendance management system',
-                              style: textTheme.bodySmall?.copyWith(
-                                color: isDark ? Colors.white70 : Colors.black54,
+                              const SizedBox(height: 4),
+                              Text(
+                                'Secure attendance management system',
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: isDark
+                                      ? Colors.white70
+                                      : Colors.black54,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        'Login akun Anda',
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : AppColors.navy,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Masuk dengan email & password',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: isDark ? Colors.white70 : Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        decoration: const InputDecoration(labelText: 'Email'),
-                        keyboardType: TextInputType.emailAddress,
-                        onChanged: (v) => setState(() => email = v),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
+                              const SizedBox(height: 16),
+                            ],
                           ),
                         ),
-                        obscureText: _obscurePassword,
-                        onChanged: (v) => setState(() => password = v),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: isLoading
-                            ? null
-                            : () async {
-                                try {
-                                  final user = await ref
-                                      .read(authControllerProvider.notifier)
-                                      .loginAuto(email: email, password: password);
-                                  if (!mounted) return;
-                                  if (user.role == 'admin') {
-                                    context.go('/dashboard/admin');
-                                  } else {
-                                    context.go('/dashboard/employee');
-                                  }
-                                } catch (e) {
-                                  if (!mounted) return;
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(SnackBar(content: Text(e.toString())));
-                                }
-                              },
-                        child: isLoading
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Text('Masuk'),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Belum punya akun? Daftar di sini:',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: isDark ? Colors.white70 : Colors.black87,
+                        Text(
+                          'Login akun Anda',
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : AppColors.navy,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton(
-                        onPressed: () => context.push('/auth/signup'),
-                        child: const Text('Daftar'),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Masuk dengan email & password',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        TextField(
+                          decoration: const InputDecoration(labelText: 'Email'),
+                          keyboardType: TextInputType.emailAddress,
+                          onChanged: (v) => setState(() => email = v),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                          obscureText: _obscurePassword,
+                          onChanged: (v) => setState(() => password = v),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: isLoading
+                              ? null
+                              : () async {
+                                  try {
+                                    final user = await ref
+                                        .read(authControllerProvider.notifier)
+                                        .loginAuto(
+                                          email: email,
+                                          password: password,
+                                        );
+                                    if (!mounted) return;
+                                    if (user.role == 'admin') {
+                                      context.go('/dashboard/admin');
+                                    } else {
+                                      context.go('/dashboard/employee');
+                                    }
+                                  } catch (e) {
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(e.toString())),
+                                    );
+                                  }
+                                },
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Masuk'),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -191,7 +198,8 @@ class UnifiedSignUpScreen extends ConsumerStatefulWidget {
   const UnifiedSignUpScreen({super.key});
 
   @override
-  ConsumerState<UnifiedSignUpScreen> createState() => _UnifiedSignUpScreenState();
+  ConsumerState<UnifiedSignUpScreen> createState() =>
+      _UnifiedSignUpScreenState();
 }
 
 class _UnifiedSignUpScreenState extends ConsumerState<UnifiedSignUpScreen> {
@@ -221,104 +229,129 @@ class _UnifiedSignUpScreenState extends ConsumerState<UnifiedSignUpScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Daftar Sebagai Karyawan', style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(
-              'Catatan: Admin account dibuat langsung melalui database atau oleh admin lain.',
-              style: textTheme.bodySmall?.copyWith(
-                color: isDark ? Colors.white70 : Colors.black54,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Daftar Sebagai Karyawan',
+                style: textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              decoration: const InputDecoration(labelText: 'Nama'),
-              onChanged: (v) => name = v,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              decoration: const InputDecoration(labelText: 'Email'),
-              keyboardType: TextInputType.emailAddress,
-              onChanged: (v) => email = v,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              decoration: const InputDecoration(labelText: 'Kontak (opsional)'),
-              keyboardType: TextInputType.phone,
-              onChanged: (v) => contact = v,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true,
-              onChanged: (v) => password = v,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: isLoading
-                  ? null
-                  : () async {
-                      // Validate inputs
-                      if (name.trim().isEmpty || email.trim().isEmpty || password.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Nama, email, dan password wajib diisi.')),
-                        );
-                        return;
-                      }
-                      
-                      try {
-                        // Sign out any existing session first
-                        await ref.read(authControllerProvider.notifier).signOut();
-                        
-                        final user = await ref.read(authControllerProvider.notifier).employeeSignUp(
-                              name: name.trim(),
-                              email: email.trim(),
-                              password: password,
-                              contact: contact.trim(),
-                            );
-                        if (!mounted) return;
-                        // Invalidate user provider to refresh
-                        ref.invalidate(currentUserProvider);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Berhasil mendaftar sebagai Karyawan: ${user.name}')),
-                        );
-                        context.go('/dashboard/employee');
-                      } catch (e) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text('Error: $e')));
-                      }
-                    },
-              child: isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Daftar'),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () => context.go('/auth'),
-              child: const Text('Sudah punya akun? Masuk'),
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                'Catatan: Admin account dibuat langsung melalui database atau oleh admin lain.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                decoration: const InputDecoration(labelText: 'Nama'),
+                onChanged: (v) => name = v,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+                onChanged: (v) => email = v,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Kontak (opsional)',
+                ),
+                keyboardType: TextInputType.phone,
+                onChanged: (v) => contact = v,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                decoration: const InputDecoration(labelText: 'Password'),
+                obscureText: true,
+                onChanged: (v) => password = v,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        // Validate inputs
+                        if (name.trim().isEmpty ||
+                            email.trim().isEmpty ||
+                            password.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Nama, email, dan password wajib diisi.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
+                        try {
+                          // Sign out any existing session first
+                          await ref
+                              .read(authControllerProvider.notifier)
+                              .signOut();
+
+                          final user = await ref
+                              .read(authControllerProvider.notifier)
+                              .employeeSignUp(
+                                name: name.trim(),
+                                email: email.trim(),
+                                password: password,
+                                contact: contact.trim(),
+                              );
+                          if (!mounted) return;
+                          // Invalidate user provider to refresh
+                          ref.invalidate(currentUserProvider);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Berhasil mendaftar sebagai Karyawan: ${user.name}',
+                              ),
+                            ),
+                          );
+                          context.go('/dashboard/employee');
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        }
+                      },
+                child: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Daftar'),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => context.go('/auth'),
+                child: const Text('Sudah punya akun? Masuk'),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 }
 
-
 class EmployeeSignUpScreen extends ConsumerStatefulWidget {
   const EmployeeSignUpScreen({super.key});
 
   @override
-  ConsumerState<EmployeeSignUpScreen> createState() => _EmployeeSignUpScreenState();
+  ConsumerState<EmployeeSignUpScreen> createState() =>
+      _EmployeeSignUpScreenState();
 }
 
 class _EmployeeSignUpScreenState extends ConsumerState<EmployeeSignUpScreen> {
@@ -338,7 +371,8 @@ class _EmployeeSignUpScreenState extends ConsumerState<EmployeeSignUpScreen> {
       ),
       body: _AuthForm(
         title: 'Buat Akun Karyawan',
-        subtitle: 'Email, password, dan foto profil opsional. Perangkat akan diikat saat login pertama.',
+        subtitle:
+            'Email, password, dan foto profil opsional. Perangkat akan diikat saat login pertama.',
         fields: [
           _AuthField(
             label: 'Nama',
@@ -367,7 +401,9 @@ class _EmployeeSignUpScreenState extends ConsumerState<EmployeeSignUpScreen> {
         primaryActionLabel: 'Daftar',
         onPrimary: () async {
           try {
-            await ref.read(authControllerProvider.notifier).employeeSignUp(
+            await ref
+                .read(authControllerProvider.notifier)
+                .employeeSignUp(
                   name: name,
                   email: email,
                   password: password,
@@ -377,9 +413,9 @@ class _EmployeeSignUpScreenState extends ConsumerState<EmployeeSignUpScreen> {
             context.go('/dashboard/employee');
           } catch (e) {
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(e.toString())),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(e.toString())));
           }
         },
         secondaryActionLabel: 'Sudah punya akun? Masuk',
@@ -419,23 +455,30 @@ class _AuthForm extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+          Text(
+            title,
+            style: textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 6),
           Text(subtitle, style: textTheme.bodyMedium),
           const SizedBox(height: 20),
-          ...fields.map((f) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: TextField(
-                  obscureText: f.obscure,
-                  keyboardType: f.keyboardType,
-                  onChanged: f.onChanged,
-                  decoration: InputDecoration(
-                    labelText: f.label,
-                    hintText: f.hint,
-                    prefixIcon: f.prefix,
-                  ),
+          ...fields.map(
+            (f) => Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: TextField(
+                obscureText: f.obscure,
+                keyboardType: f.keyboardType,
+                onChanged: f.onChanged,
+                decoration: InputDecoration(
+                  labelText: f.label,
+                  hintText: f.hint,
+                  prefixIcon: f.prefix,
                 ),
-              )),
+              ),
+            ),
+          ),
           const SizedBox(height: 10),
           ElevatedButton(
             onPressed: isLoading ? null : onPrimary,
@@ -443,7 +486,10 @@ class _AuthForm extends StatelessWidget {
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : Text(primaryActionLabel),
           ),
@@ -464,7 +510,7 @@ class _AuthField {
     this.keyboardType,
     this.onChanged,
   });
-  
+
   final String label;
   final String hint;
   final bool obscure;
@@ -472,4 +518,3 @@ class _AuthField {
   final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged;
 }
-
