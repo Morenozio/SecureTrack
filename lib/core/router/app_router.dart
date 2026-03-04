@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/attendance/presentation/attendance_screens.dart';
+import '../../features/attendance/presentation/attendance_calendar_screen.dart';
 import '../../features/attendance/presentation/attendance_management_screen.dart';
 import '../../features/attendance/presentation/wifi_network_management_screen.dart';
 import '../../features/attendance/presentation/employee_attendance_detail_screen.dart';
@@ -12,11 +13,13 @@ import '../../features/auth/presentation/auth_screens.dart';
 import '../../features/auth/presentation/employee_list_screen.dart';
 import '../../features/auth/presentation/user_management_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screens.dart';
+import '../../features/announcements/presentation/create_announcement_screen.dart';
 import '../../features/leave/presentation/leave_screen.dart';
 import '../../features/leave/presentation/leave_inbox_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/notifications/presentation/notification_screen.dart';
 
 // ─── Shared transition builder ───────────────────────────
 CustomTransitionPage<void> _transitionPage({
@@ -70,6 +73,13 @@ final appRouterProvider = Provider<GoRouter>(
             _transitionPage(state: state, child: const AdminDashboardScreen()),
       ),
       GoRoute(
+        path: '/dashboard/admin/create-announcement',
+        pageBuilder: (context, state) => _transitionPage(
+          state: state,
+          child: const CreateAnnouncementScreen(),
+        ),
+      ),
+      GoRoute(
         path: '/dashboard/employee',
         pageBuilder: (context, state) => _transitionPage(
           state: state,
@@ -89,6 +99,13 @@ final appRouterProvider = Provider<GoRouter>(
         ),
       ),
       GoRoute(
+        path: '/attendance/calendar',
+        pageBuilder: (context, state) => _transitionPage(
+          state: state,
+          child: const AttendanceCalendarScreen(),
+        ),
+      ),
+      GoRoute(
         path: '/leave',
         pageBuilder: (context, state) =>
             _transitionPage(state: state, child: const LeaveRequestScreen()),
@@ -102,6 +119,11 @@ final appRouterProvider = Provider<GoRouter>(
         path: '/profile',
         pageBuilder: (context, state) =>
             _transitionPage(state: state, child: const ProfileScreen()),
+      ),
+      GoRoute(
+        path: '/notifications',
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const NotificationScreen()),
       ),
       GoRoute(
         path: '/qr',
@@ -141,6 +163,11 @@ final appRouterProvider = Provider<GoRouter>(
         path: '/admin/settings',
         pageBuilder: (context, state) =>
             _transitionPage(state: state, child: const SettingsScreen()),
+      ),
+      GoRoute(
+        path: '/admin/profile',
+        pageBuilder: (context, state) =>
+            _transitionPage(state: state, child: const ProfileScreen()),
       ),
       GoRoute(
         path: '/admin/employee-attendance/:userId',

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/animated_page.dart';
@@ -11,7 +12,9 @@ import '../application/leave_controller.dart';
 import '../data/leave_repository.dart';
 
 class LeaveInboxScreen extends ConsumerStatefulWidget {
-  const LeaveInboxScreen({super.key});
+  const LeaveInboxScreen({super.key, this.showAppBar = true});
+
+  final bool showAppBar;
 
   @override
   ConsumerState<LeaveInboxScreen> createState() => _LeaveInboxScreenState();
@@ -230,6 +233,9 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen>
     final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
     final processedAt = (data['processedAt'] as Timestamp?)?.toDate();
 
+    final startDate = (data['startDate'] as Timestamp?)?.toDate();
+    final endDate = (data['endDate'] as Timestamp?)?.toDate();
+
     Color statusColor;
     IconData statusIcon;
     switch (status) {
@@ -245,6 +251,8 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen>
         statusColor = Colors.orange;
         statusIcon = Icons.hourglass_top;
     }
+
+    final df = DateFormat('dd/MM/yyyy');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -262,6 +270,8 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen>
           children: [
             const SizedBox(height: 4),
             Text('Jenis: $type'),
+            if (startDate != null && endDate != null)
+              Text('Tanggal: ${df.format(startDate)} – ${df.format(endDate)}'),
             Text('Status: $status'),
             if (createdAt != null)
               Text(
@@ -379,16 +389,19 @@ class _LeaveInboxScreenState extends ConsumerState<LeaveInboxScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              context.go('/dashboard/admin');
-            }
-          },
-        ),
+        leading: widget.showAppBar
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    context.go('/dashboard/admin');
+                  }
+                },
+              )
+            : null,
+        automaticallyImplyLeading: widget.showAppBar,
         title: const Text('Inbox Permohonan Cuti'),
         bottom: TabBar(
           controller: _tabController,

@@ -1,10 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/firebase/firebase_providers.dart';
 import '../../auth/data/user_providers.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -18,18 +17,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(milliseconds: 300), _redirect);
+    _redirect();
   }
 
   Future<void> _redirect() async {
-    final auth = ref.read(authStateProvider);
-    final current = auth.valueOrNull;
+    // Wait for Firebase Auth to restore the persisted session
+    final firebaseUser = await ref
+        .read(firebaseAuthProvider)
+        .authStateChanges()
+        .first;
     if (!mounted) return;
-    if (current == null) {
+    if (firebaseUser == null) {
       context.go('/auth');
       return;
     }
-    final userDoc = await ref.read(usersCollectionProvider).doc(current.uid).get();
+    final userDoc = await ref
+        .read(usersCollectionProvider)
+        .doc(firebaseUser.uid)
+        .get();
     final role = userDoc.data()?['role'] as String? ?? '';
     if (!mounted) return;
     if (role == 'admin') {
@@ -62,22 +67,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
-              child: Icon(Icons.verified_user, color: scheme.secondary, size: 72),
+              child: Icon(
+                Icons.verified_user,
+                color: scheme.secondary,
+                size: 72,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
               'SecureTrack',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Absensi aman dengan verifikasi berlapis',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.white.withOpacity(0.85),
-                  ),
+                color: Colors.white.withOpacity(0.85),
+              ),
             ),
             const SizedBox(height: 32),
             const CircularProgressIndicator(color: Colors.white),
@@ -87,4 +96,3 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     );
   }
 }
-

@@ -15,6 +15,16 @@ import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/data/wifi_network_repository.dart';
 import '../../auth/data/user_providers.dart';
 import '../../leave/data/leave_repository.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../announcements/presentation/announcement_feed.dart';
+import '../../announcements/presentation/create_announcement_screen.dart';
+import '../../attendance/presentation/attendance_management_screen.dart';
+import '../../auth/presentation/employee_list_screen.dart';
+import '../../leave/presentation/leave_screen.dart';
+import '../../leave/presentation/leave_inbox_screen.dart';
+import '../../profile/presentation/profile_screen.dart';
+import '../../attendance/presentation/attendance_calendar_screen.dart';
+import '../../settings/presentation/settings_screen.dart';
 
 // ──────────────────────────────────────────────────────────
 //  ADMIN DASHBOARD
@@ -64,7 +74,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final userAsync = ref.watch(currentUserProvider);
     final attendanceRepo = ref.watch(attendanceRepositoryProvider);
-    final recentLogs = attendanceRepo.streamRecentLogs();
+    final todayLogsAsync = ref.watch(todayAttendanceLogsProvider);
+
     final employeesStream = ref
         .watch(usersCollectionProvider)
         .where('role', isEqualTo: 'employee')
@@ -79,363 +90,445 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
       backgroundColor: isDark
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ─── Top Navbar ───
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.cardDark : Colors.white,
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark
-                        ? AppColors.primary.withOpacity(0.2)
-                        : Colors.grey.shade200,
+      body: IndexedStack(
+        index: _navIndex,
+        children: [
+          // Tab 0: Home (Admin Dashboard content)
+          SafeArea(
+            child: Column(
+              children: [
+                // ─── Top Navbar ───
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
                   ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  // Profile avatar
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      color: Colors.white,
-                      size: 22,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.cardDark : Colors.white,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark
+                            ? AppColors.primary.withOpacity(0.2)
+                            : Colors.grey.shade200,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        userAsync.when(
-                          data: (user) => Text(
-                            'Hello, ${user?.name ?? 'Admin'}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          loading: () => const Text(
-                            'Loading...',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          error: (_, __) => const Text(
-                            'Hello, Admin',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          dateStr,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isDark
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade500,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Notification bell
-                  _NavBarIcon(
-                    icon: Icons.notifications_outlined,
-                    isDark: isDark,
-                    onTap: () {},
-                    showBadge: true,
-                  ),
-                  const SizedBox(width: 4),
-                  // Dark mode toggle
-                  _NavBarIcon(
-                    icon: isDark
-                        ? Icons.light_mode_outlined
-                        : Icons.dark_mode_outlined,
-                    isDark: isDark,
-                    onTap: () =>
-                        ref.read(themeModeProvider.notifier).toggleTheme(),
-                  ),
-                ],
-              ),
-            ),
-
-            // ─── Scrollable content ───
-            Expanded(
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: SlideTransition(
-                  position: _slideAnim,
-                  child: ListView(
-                    padding: const EdgeInsets.only(bottom: 24),
+                  child: Row(
                     children: [
-                      // Quick Actions
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _PrimaryActionButton(
-                                icon: Icons.person_add_alt,
-                                label: 'Add Employee',
-                                onTap: () =>
-                                    context.push('/admin/add-employee'),
-                              ),
-                              const SizedBox(width: 12),
-                              _OutlinedActionButton(
-                                icon: Icons.download_outlined,
-                                label: 'Reports',
-                                isDark: isDark,
-                                onTap: () {},
-                              ),
-                              const SizedBox(width: 12),
-                              StreamBuilder<
-                                QuerySnapshot<Map<String, dynamic>>
-                              >(
-                                stream: pendingLeavesStream,
-                                builder: (context, snap) {
-                                  final count = snap.data?.docs.length ?? 0;
-                                  return _OutlinedActionButton(
-                                    icon: Icons.inbox,
-                                    label:
-                                        'Inbox Cuti${count > 0 ? ' ($count)' : ''}',
-                                    isDark: isDark,
-                                    onTap: () =>
-                                        context.push('/admin/leave-inbox'),
-                                  );
-                                },
-                              ),
-                            ],
+                      // Profile avatar
+                      GestureDetector(
+                        onTap: () => context.push('/admin/profile'),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 22,
                           ),
                         ),
                       ),
-
-                      // Stats Grid
-                      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: employeesStream,
-                        builder: (context, empSnapshot) {
-                          final totalEmployees =
-                              empSnapshot.data?.docs.length ?? 0;
-
-                          return StreamBuilder<
-                            QuerySnapshot<Map<String, dynamic>>
-                          >(
-                            stream: allUsersStream,
-                            builder: (context, allSnapshot) {
-                              final totalUsers =
-                                  allSnapshot.data?.docs.length ?? 0;
-
-                              return FutureBuilder<
-                                List<
-                                  QueryDocumentSnapshot<Map<String, dynamic>>
-                                >
-                              >(
-                                future: attendanceRepo.getTodayCheckIns(),
-                                builder: (context, checkInSnap) {
-                                  final todayCheckIns = checkInSnap.data ?? [];
-                                  final presentCount = todayCheckIns.length;
-                                  final absentCount =
-                                      totalEmployees - presentCount;
-
-                                  // Determine late arrivals (check-in after 09:00)
-                                  int lateCount = 0;
-                                  for (final doc in todayCheckIns) {
-                                    final checkIn =
-                                        (doc.data()['checkIn'] as Timestamp?)
-                                            ?.toDate();
-                                    if (checkIn != null &&
-                                        checkIn.hour >= 9 &&
-                                        checkIn.minute > 0) {
-                                      lateCount++;
-                                    }
-                                  }
-
-                                  final presentPct = totalEmployees > 0
-                                      ? '${(presentCount / totalEmployees * 100).toStringAsFixed(0)}%'
-                                      : '0%';
-                                  final absentPct = totalEmployees > 0
-                                      ? '${(absentCount / totalEmployees * 100).toStringAsFixed(0)}%'
-                                      : '0%';
-                                  final latePct = totalEmployees > 0
-                                      ? '${(lateCount / totalEmployees * 100).toStringAsFixed(0)}%'
-                                      : '0%';
-
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: _DashStatCard(
-                                                icon: Icons.groups,
-                                                iconColor: AppColors.primary,
-                                                iconBgColor: AppColors.primary
-                                                    .withOpacity(0.1),
-                                                title: 'Total Staff',
-                                                value: '$totalUsers',
-                                                badge:
-                                                    '+${totalEmployees > 0 ? 2 : 0}%',
-                                                badgeColor: AppColors.success,
-                                                isDark: isDark,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: _DashStatCard(
-                                                icon: Icons.how_to_reg,
-                                                iconColor: AppColors.success,
-                                                iconBgColor: AppColors.success
-                                                    .withOpacity(0.1),
-                                                title: 'Present',
-                                                value: '$presentCount',
-                                                badge: presentPct,
-                                                badgeColor: AppColors.success,
-                                                isDark: isDark,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: _DashStatCard(
-                                                icon: Icons.person_off,
-                                                iconColor: AppColors.danger,
-                                                iconBgColor: AppColors.danger
-                                                    .withOpacity(0.1),
-                                                title: 'Absent',
-                                                value: '$absentCount',
-                                                badge: absentPct,
-                                                badgeColor: AppColors.danger,
-                                                isDark: isDark,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: _DashStatCard(
-                                                icon: Icons.schedule,
-                                                iconColor: AppColors.warning,
-                                                iconBgColor: AppColors.warning
-                                                    .withOpacity(0.1),
-                                                title: 'Late Arrival',
-                                                value: '$lateCount',
-                                                badge: latePct,
-                                                badgeColor: AppColors.warning,
-                                                isDark: isDark,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Attendance Trend Chart
-                      _AttendanceTrendChart(isDark: isDark),
-
-                      const SizedBox(height: 20),
-
-                      // Recent Check-ins
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Recent Check-ins',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                            userAsync.when(
+                              data: (user) => Text(
+                                'Hello, ${user?.name ?? 'Admin'}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              loading: () => const Text(
+                                'Loading...',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              error: (_, __) => const Text(
+                                'Hello, Admin',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
-                            InkWell(
-                              borderRadius: BorderRadius.circular(4),
-                              onTap: () => context.push('/admin/employees'),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 2,
-                                ),
-                                child: Text(
-                                  'View All',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDark
-                                        ? AppColors.accent
-                                        : AppColors.primary,
-                                  ),
-                                ),
+                            Text(
+                              dateStr,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade500,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      // Notification bell
+                      _NavBarIcon(
+                        icon: Icons.notifications_outlined,
+                        isDark: isDark,
+                        onTap: () => context.push('/notifications'),
+                        showBadge: true,
+                      ),
+                      const SizedBox(width: 4),
+                      // Dark mode toggle
+                      _NavBarIcon(
+                        icon: isDark
+                            ? Icons.light_mode_outlined
+                            : Icons.dark_mode_outlined,
+                        isDark: isDark,
+                        onTap: () =>
+                            ref.read(themeModeProvider.notifier).toggleTheme(),
+                      ),
+                    ],
+                  ),
+                ),
 
-                      // Check-in list
-                      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: ref.watch(usersCollectionProvider).snapshots(),
-                        builder: (context, usersSnapshot) {
-                          final userDocs = usersSnapshot.data?.docs ?? [];
-                          final Map<String, String> userNameById = {
-                            for (final doc in userDocs)
-                              doc.id: (doc.data()['name'] ?? doc.id).toString(),
-                          };
-                          final Map<String, String> userDeptById = {
-                            for (final doc in userDocs)
-                              doc.id: (doc.data()['department'] ?? 'Staff')
-                                  .toString(),
-                          };
-
-                          return StreamBuilder<
-                            QuerySnapshot<Map<String, dynamic>>
-                          >(
-                            stream: recentLogs,
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Center(
-                                    child: CircularProgressIndicator(),
+                // ─── Scrollable content ───
+                Expanded(
+                  child: FadeTransition(
+                    opacity: _fadeAnim,
+                    child: SlideTransition(
+                      position: _slideAnim,
+                      child: ListView(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        children: [
+                          // Quick Actions
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _PrimaryActionButton(
+                                    icon: Icons.campaign_outlined,
+                                    label: 'Post Update',
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const CreateAnnouncementScreen(),
+                                      ),
+                                    ),
                                   ),
+                                  const SizedBox(width: 12),
+                                  _OutlinedActionButton(
+                                    icon: Icons.person_add_alt,
+                                    label: 'Add Employee',
+                                    isDark: isDark,
+                                    onTap: () =>
+                                        context.push('/admin/add-employee'),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  StreamBuilder<
+                                    QuerySnapshot<Map<String, dynamic>>
+                                  >(
+                                    stream: pendingLeavesStream,
+                                    builder: (context, snap) {
+                                      final count = snap.data?.docs.length ?? 0;
+                                      return _OutlinedActionButton(
+                                        icon: Icons.inbox,
+                                        label:
+                                            'Inbox Cuti${count > 0 ? ' ($count)' : ''}',
+                                        isDark: isDark,
+                                        onTap: () =>
+                                            context.push('/admin/leave-inbox'),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // Company Announcements Feed (Admin View)
+                          const AnnouncementFeed(isAdmin: true),
+
+                          const SizedBox(height: 12),
+
+                          // Stats Grid
+                          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                            stream: employeesStream,
+                            builder: (context, empSnapshot) {
+                              final totalEmployees =
+                                  empSnapshot.data?.docs.length ?? 0;
+
+                              return StreamBuilder<
+                                QuerySnapshot<Map<String, dynamic>>
+                              >(
+                                stream: allUsersStream,
+                                builder: (context, allSnapshot) {
+                                  final totalUsers =
+                                      allSnapshot.data?.docs.length ?? 0;
+
+                                  return FutureBuilder<
+                                    List<
+                                      QueryDocumentSnapshot<
+                                        Map<String, dynamic>
+                                      >
+                                    >
+                                  >(
+                                    future: attendanceRepo.getTodayCheckIns(),
+                                    builder: (context, checkInSnap) {
+                                      final todayCheckIns =
+                                          checkInSnap.data ?? [];
+                                      final presentCount = todayCheckIns.length;
+                                      final absentCount =
+                                          totalEmployees - presentCount;
+
+                                      // Determine late arrivals (check-in after 09:00)
+                                      int lateCount = 0;
+                                      for (final doc in todayCheckIns) {
+                                        final checkIn =
+                                            (doc.data()['checkIn']
+                                                    as Timestamp?)
+                                                ?.toDate();
+                                        if (checkIn != null &&
+                                            checkIn.hour >= 9 &&
+                                            checkIn.minute > 0) {
+                                          lateCount++;
+                                        }
+                                      }
+
+                                      final presentPct = totalEmployees > 0
+                                          ? '${(presentCount / totalEmployees * 100).toStringAsFixed(0)}%'
+                                          : '0%';
+                                      final absentPct = totalEmployees > 0
+                                          ? '${(absentCount / totalEmployees * 100).toStringAsFixed(0)}%'
+                                          : '0%';
+                                      final latePct = totalEmployees > 0
+                                          ? '${(lateCount / totalEmployees * 100).toStringAsFixed(0)}%'
+                                          : '0%';
+
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: _DashStatCard(
+                                                    icon: Icons.groups,
+                                                    iconColor:
+                                                        AppColors.primary,
+                                                    iconBgColor: AppColors
+                                                        .primary
+                                                        .withOpacity(0.1),
+                                                    title: 'Total Staff',
+                                                    value: '$totalUsers',
+                                                    badge:
+                                                        '+${totalEmployees > 0 ? 2 : 0}%',
+                                                    badgeColor:
+                                                        AppColors.success,
+                                                    isDark: isDark,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: _DashStatCard(
+                                                    icon: Icons.how_to_reg,
+                                                    iconColor:
+                                                        AppColors.success,
+                                                    iconBgColor: AppColors
+                                                        .success
+                                                        .withOpacity(0.1),
+                                                    title: 'Present',
+                                                    value: '$presentCount',
+                                                    badge: presentPct,
+                                                    badgeColor:
+                                                        AppColors.success,
+                                                    isDark: isDark,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: _DashStatCard(
+                                                    icon: Icons.person_off,
+                                                    iconColor: AppColors.danger,
+                                                    iconBgColor: AppColors
+                                                        .danger
+                                                        .withOpacity(0.1),
+                                                    title: 'Absent',
+                                                    value: '$absentCount',
+                                                    badge: absentPct,
+                                                    badgeColor:
+                                                        AppColors.danger,
+                                                    isDark: isDark,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: _DashStatCard(
+                                                    icon: Icons.schedule,
+                                                    iconColor:
+                                                        AppColors.warning,
+                                                    iconBgColor: AppColors
+                                                        .warning
+                                                        .withOpacity(0.1),
+                                                    title: 'Late Arrival',
+                                                    value: '$lateCount',
+                                                    badge: latePct,
+                                                    badgeColor:
+                                                        AppColors.warning,
+                                                    isDark: isDark,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Attendance Trend Chart
+                          _AttendanceTrendChart(isDark: isDark),
+
+                          const SizedBox(height: 20),
+
+                          // ─── Live Attendance Monitoring ───
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Live Attendance Monitoring',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _LiveBadge(
+                                      isDark: isDark,
+                                      isOnline: !todayLogsAsync.hasError,
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      onPressed: () {
+                                        ref.refresh(
+                                          todayAttendanceLogsProvider,
+                                        );
+                                      },
+                                      icon: Icon(
+                                        Icons.refresh,
+                                        size: 18,
+                                        color: isDark
+                                            ? Colors.grey.shade400
+                                            : Colors.grey.shade600,
+                                      ),
+                                      tooltip: 'Refresh',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      splashRadius: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(4),
+                                      onTap: () => context.push(
+                                        '/admin/attendance-management',
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 2,
+                                        ),
+                                        child: Text(
+                                          'View All',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark
+                                                ? AppColors.accent
+                                                : AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Attendance Table
+                          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                            stream: employeesStream,
+                            builder: (context, empSnapshot) {
+                              final employees = empSnapshot.data?.docs ?? [];
+
+                              // Show loading only if loading AND no data
+                              if (todayLogsAsync.isLoading &&
+                                  !todayLogsAsync.hasValue) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
                                 );
                               }
-                              final docs = snapshot.data?.docs ?? [];
-                              if (docs.isEmpty) {
+
+                              final todayLogs =
+                                  todayLogsAsync.value?.docs ?? [];
+
+                              // Map userId -> log data
+                              final logsByUser = {
+                                for (final queryDoc in todayLogs)
+                                  queryDoc.data()['userId']: queryDoc.data(),
+                              };
+
+                              // Build rows (Take top 5)
+                              final rows = employees.take(5).map((empDoc) {
+                                final empData = empDoc.data();
+                                final userId = empDoc.id;
+                                final name = empData['name'] ?? 'Unknown';
+                                final log = logsByUser[userId];
+
+                                return _LiveAttendanceRowData(
+                                  name: name,
+                                  checkIn: (log?['checkIn'] as Timestamp?)
+                                      ?.toDate(),
+                                  checkOut: (log?['checkOut'] as Timestamp?)
+                                      ?.toDate(),
+                                  status: log?['status'],
+                                );
+                              }).toList();
+
+                              if (rows.isEmpty) {
                                 return Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Center(
                                     child: Text(
-                                      'Belum ada log absensi',
+                                      'No employees found',
                                       style: TextStyle(
                                         color: isDark
                                             ? Colors.grey.shade400
@@ -445,60 +538,134 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
                                   ),
                                 );
                               }
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
+
+                              return Container(
+                                margin: const EdgeInsets.symmetric(
                                   horizontal: 16,
                                 ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? AppColors.cardDark
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? AppColors.primary.withOpacity(0.1)
+                                        : Colors.grey.shade200,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.02),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
                                 child: Column(
-                                  children: docs.take(5).map((d) {
-                                    final data = d.data();
-                                    final userId = data['userId'] ?? '-';
-                                    final userName =
-                                        userNameById[userId] ??
-                                        userId.toString();
-                                    final dept =
-                                        userDeptById[userId] ?? 'Staff';
-                                    final checkIn =
-                                        (data['checkIn'] as Timestamp?)
-                                            ?.toDate();
-                                    final checkOut =
-                                        data['checkOut'] as Timestamp?;
-                                    final timeStr = checkIn != null
-                                        ? DateFormat('hh:mm a').format(checkIn)
-                                        : '--:--';
-
-                                    // Determine status
-                                    String status = 'Present';
-                                    if (checkIn != null &&
-                                        checkIn.hour >= 9 &&
-                                        checkIn.minute > 0) {
-                                      status = 'Late';
-                                    }
-                                    if (checkOut == null && checkIn == null) {
-                                      status = 'Absent';
-                                    }
-
-                                    return _RecentCheckInCard(
-                                      name: userName,
-                                      department: dept,
-                                      time: timeStr,
-                                      status: status,
-                                      isDark: isDark,
-                                    );
-                                  }).toList(),
+                                  children: [
+                                    // Table Header
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? AppColors.primary.withOpacity(0.1)
+                                            : Colors.grey.shade50,
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: isDark
+                                                ? AppColors.primary.withOpacity(
+                                                    0.1,
+                                                  )
+                                                : Colors.grey.shade200,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Expanded(
+                                            flex: 3,
+                                            child: Text(
+                                              'Employee',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                          const Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              'Check In',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                          const Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              'Check Out',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                          const Expanded(
+                                            flex: 2,
+                                            child: Center(
+                                              child: Text(
+                                                'Status',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Rows
+                                    ...rows.asMap().entries.map((entry) {
+                                      return _LiveAttendanceRowItem(
+                                        data: entry.value,
+                                        isLast: entry.key == rows.length - 1,
+                                        isDark: isDark,
+                                      );
+                                    }),
+                                  ],
                                 ),
                               );
                             },
-                          );
-                        },
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+
+          // Tab 1: Staff (Employee List)
+          const EmployeeListScreen(showAppBar: false),
+
+          // Tab 2: Attendance Management
+          const AttendanceManagementScreen(showAppBar: false),
+
+          // Tab 3: Leave Inbox
+          const LeaveInboxScreen(showAppBar: false),
+
+          // Tab 4: Settings
+          const SettingsScreen(showAppBar: false),
+        ],
       ),
 
       // ─── Bottom Navigation ───
@@ -515,28 +682,9 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
         child: BottomNavigationBar(
           currentIndex: _navIndex,
           onTap: (index) {
-            if (index == 0) return; // Already on home
+            if (index == _navIndex) return; // Already on this tab
             HapticFeedback.lightImpact();
-            String? route;
-            switch (index) {
-              case 1:
-                route = '/admin/employees';
-                break;
-              case 2:
-                route = '/admin/attendance-management';
-                break;
-              case 3:
-                route = '/admin/leave-inbox';
-                break;
-              case 4:
-                route = '/admin/settings';
-                break;
-            }
-            if (route != null) {
-              context.push(route).then((_) {
-                if (mounted) setState(() => _navIndex = 0);
-              });
-            }
+            setState(() => _navIndex = index);
           },
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'HOME'),
@@ -750,524 +898,739 @@ class _EmployeeDashboardScreenState
       backgroundColor: isDark
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            expandedHeight: 180,
-            floating: false,
-            pinned: true,
-            automaticallyImplyLeading: false,
-            backgroundColor: isDark
-                ? AppColors.backgroundDark
-                : AppColors.backgroundLight,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                padding: const EdgeInsets.only(top: 60, left: 24, right: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
+      body: IndexedStack(
+        index: _navIndex,
+        children: [
+          // Index 0: Dashboard Home
+          CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 180,
+                floating: false,
+                pinned: true,
+                automaticallyImplyLeading: false,
+                backgroundColor: isDark
+                    ? AppColors.backgroundDark
+                    : AppColors.backgroundLight,
+                elevation: 0,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    padding: const EdgeInsets.only(
+                      top: 60,
+                      left: 24,
+                      right: 24,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.person_outline,
-                            color: AppColors.primary,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                        Row(
                           children: [
-                            Text(
-                              greeting,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: isDark
-                                    ? Colors.grey.shade400
-                                    : Colors.grey.shade500,
-                                fontWeight: FontWeight.w500,
+                            GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                setState(() => _navIndex = 3);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.person_outline,
+                                  color: AppColors.primary,
+                                  size: 24,
+                                ),
                               ),
                             ),
-                            Text(
-                              user.name,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  greeting,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark
+                                        ? Colors.grey.shade400
+                                        : Colors.grey.shade500,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  user.name,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => context.push('/notifications'),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? AppColors.cardDark
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? AppColors.primary.withOpacity(0.1)
+                                        : Colors.grey.shade200,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.notifications_none,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () async {
+                                HapticFeedback.lightImpact();
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Konfirmasi Logout'),
+                                    content: const Text(
+                                      'Apakah Anda yakin ingin keluar?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, false),
+                                        child: const Text('Batal'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, true),
+                                        child: const Text(
+                                          'Logout',
+                                          style: TextStyle(
+                                            color: AppColors.danger,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  await ref
+                                      .read(authControllerProvider.notifier)
+                                      .signOut();
+                                  if (context.mounted) context.go('/auth');
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? AppColors.cardDark
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? AppColors.primary.withOpacity(0.1)
+                                        : Colors.grey.shade200,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.logout,
+                                  size: 20,
+                                  color: AppColors.danger,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.cardDark : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isDark
-                              ? AppColors.primary.withOpacity(0.1)
-                              : Colors.grey.shade200,
-                        ),
-                      ),
-                      child: const Icon(Icons.notifications_none, size: 20),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        ],
-        body: FadeTransition(
-          opacity: _fadeAnim,
-          child: SlideTransition(
-            position: _slideAnim,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // WiFi Status Chip
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _buildWifiStatusChip(),
-                  ),
-
-                  // Warning banner when wrong WiFi
-                  if (_isWifiVerified == false && _wifiInfo?.ssid != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.danger.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.danger.withOpacity(0.3),
-                          ),
+              SliverToBoxAdapter(
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: Column(
+                      children: [
+                        // WiFi Status Chip
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _buildWifiStatusChip(),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              color: AppColors.danger,
-                              size: 20,
+
+                        // Warning banner when wrong WiFi
+                        if (_isWifiVerified == false && _wifiInfo?.ssid != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'WiFi "${_wifiInfo!.ssid}" tidak terdaftar. '
-                                'Anda tidak bisa check-in dengan jaringan ini. '
-                                'Hubungkan ke WiFi kantor.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.danger,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  const SizedBox(height: 24),
-
-                  // Timer & Action Section (Reactive)
-                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: _activeSessionStream,
-                    builder: (context, snapshot) {
-                      DateTime? todayCheckIn;
-                      bool isCheckedIn = false;
-
-                      if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                        final data = snapshot.data!.docs.first.data();
-                        final checkInRaw = data['checkIn'];
-                        final checkIn = checkInRaw is Timestamp
-                            ? checkInRaw.toDate()
-                            : null;
-
-                        isCheckedIn = true;
-                        todayCheckIn = checkIn ?? DateTime.now();
-                      }
-
-                      return Column(
-                        children: [
-                          if (isCheckedIn)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
-                              ),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: AppColors.success.withOpacity(0.1),
+                                color: AppColors.danger.withOpacity(0.08),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: AppColors.success.withOpacity(0.5),
+                                  color: AppColors.danger.withOpacity(0.3),
                                 ),
                               ),
                               child: Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.success,
-                                      shape: BoxShape.circle,
-                                    ),
+                                  Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: AppColors.danger,
+                                    size: 20,
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'CHECKED IN',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.success,
-                                      letterSpacing: 1,
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'WiFi "${_wifiInfo!.ssid}" tidak terdaftar. '
+                                      'Anda tidak bisa check-in dengan jaringan ini. '
+                                      'Hubungkan ke WiFi kantor.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.danger,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.4,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-
-                          const SizedBox(height: 16),
-                          _LiveWorkTimer(
-                            checkInTime: todayCheckIn,
-                            isDark: isDark,
                           ),
-                          const SizedBox(height: 32),
 
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Consumer(
-                              builder: (context, watchRef, _) {
-                                final attState = watchRef.watch(
-                                  attendanceControllerProvider,
-                                );
-                                final isLoading = attState is AsyncLoading;
+                        const SizedBox(height: 24),
 
-                                return SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: isLoading
-                                        ? null
-                                        : () async {
-                                            final controller = ref.read(
-                                              attendanceControllerProvider
-                                                  .notifier,
-                                            );
-                                            try {
-                                              if (isCheckedIn) {
-                                                await controller.checkOut(user);
-                                                if (context.mounted) {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Check-out successful!',
-                                                      ),
-                                                      backgroundColor:
-                                                          AppColors.success,
-                                                    ),
-                                                  );
-                                                }
-                                              } else {
-                                                await controller.checkIn(user);
-                                                if (context.mounted) {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Check-in successful!',
-                                                      ),
-                                                      backgroundColor:
-                                                          AppColors.success,
-                                                    ),
-                                                  );
-                                                }
-                                              }
-                                            } catch (e) {
-                                              if (context.mounted) {
-                                                final errorMsg =
-                                                    e.toString().contains(
-                                                      'Exception:',
-                                                    )
-                                                    ? e
-                                                          .toString()
-                                                          .split('Exception:')
-                                                          .last
-                                                          .trim()
-                                                    : e.toString();
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(errorMsg),
-                                                    backgroundColor:
-                                                        AppColors.danger,
-                                                  ),
-                                                );
-                                              }
-                                            }
-                                          },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: isCheckedIn
-                                          ? AppColors.danger
-                                          : AppColors.primary,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 18,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    child: isLoading
-                                        ? const SizedBox(
-                                            height: 24,
-                                            width: 24,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                isCheckedIn
-                                                    ? Icons.logout
-                                                    : Icons.login,
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Text(
-                                                isCheckedIn
-                                                    ? 'Check Out'
-                                                    : 'Check In',
-                                                style: const TextStyle(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Timeline Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "TODAY'S TIMELINE",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.5,
-                            color: isDark
-                                ? Colors.white70
-                                : Colors.grey.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
+                        // Timer & Action Section (Reactive)
                         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: _historyStream,
+                          stream: _activeSessionStream,
                           builder: (context, snapshot) {
-                            String punchIn = '--:--';
+                            DateTime? todayCheckIn;
+                            bool isCheckedIn = false;
+
                             if (snapshot.hasData &&
                                 snapshot.data!.docs.isNotEmpty) {
-                              final today = DateTime.now();
-                              for (final doc in snapshot.data!.docs) {
-                                final checkIn =
-                                    (doc.data()['checkIn'] as Timestamp?)
-                                        ?.toDate();
-                                if (checkIn != null &&
-                                    checkIn.day == today.day &&
-                                    checkIn.month == today.month &&
-                                    checkIn.year == today.year) {
-                                  punchIn = DateFormat(
-                                    'hh:mm a',
-                                  ).format(checkIn);
-                                  break;
-                                }
-                              }
+                              final data = snapshot.data!.docs.first.data();
+                              final checkInRaw = data['checkIn'];
+                              final checkIn = checkInRaw is Timestamp
+                                  ? checkInRaw.toDate()
+                                  : null;
+
+                              isCheckedIn = true;
+                              todayCheckIn = checkIn ?? DateTime.now();
                             }
-                            return Row(
+
+                            return Column(
                               children: [
-                                Expanded(
-                                  child: _TimelineCard(
-                                    icon: Icons.login,
-                                    label: 'Punch In',
-                                    value: punchIn,
-                                    isDark: isDark,
+                                if (isCheckedIn)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: AppColors.success.withOpacity(
+                                          0.5,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.success,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'CHECKED IN',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.success,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
+
+                                const SizedBox(height: 16),
+                                _LiveWorkTimer(
+                                  checkInTime: todayCheckIn,
+                                  isDark: isDark,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _TimelineCard(
-                                    icon: Icons.coffee,
-                                    label: 'Break Time',
-                                    value: '00:00:00',
-                                    isDark: isDark,
+                                const SizedBox(height: 32),
+
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Consumer(
+                                    builder: (context, watchRef, _) {
+                                      final attState = watchRef.watch(
+                                        attendanceControllerProvider,
+                                      );
+                                      final isLoading =
+                                          attState is AsyncLoading;
+
+                                      return SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: isLoading
+                                              ? null
+                                              : () async {
+                                                  final controller = ref.read(
+                                                    attendanceControllerProvider
+                                                        .notifier,
+                                                  );
+                                                  try {
+                                                    if (isCheckedIn) {
+                                                      await controller.checkOut(
+                                                        user,
+                                                      );
+                                                    } else {
+                                                      await controller.checkIn(
+                                                        user,
+                                                        manualSsid:
+                                                            _wifiInfo?.ssid,
+                                                        manualBssid:
+                                                            _wifiInfo?.bssid,
+                                                      );
+                                                    }
+                                                    if (!context.mounted)
+                                                      return;
+                                                    final state = ref.read(
+                                                      attendanceControllerProvider,
+                                                    );
+                                                    if (state.hasError) {
+                                                      final errorMsg = state
+                                                          .error
+                                                          .toString()
+                                                          .replaceFirst(
+                                                            RegExp(
+                                                              r'^Exception:\s*',
+                                                            ),
+                                                            '',
+                                                          )
+                                                          .trim();
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(
+                                                            errorMsg,
+                                                          ),
+                                                          backgroundColor:
+                                                              AppColors.danger,
+                                                          duration:
+                                                              const Duration(
+                                                                seconds: 5,
+                                                              ),
+                                                        ),
+                                                      );
+                                                    } else {
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(
+                                                            isCheckedIn
+                                                                ? 'Check-out successful!'
+                                                                : 'Check-in successful!',
+                                                          ),
+                                                          backgroundColor:
+                                                              AppColors.success,
+                                                        ),
+                                                      );
+                                                    }
+                                                  } catch (e) {
+                                                    if (context.mounted) {
+                                                      final errorMsg = e
+                                                          .toString()
+                                                          .replaceFirst(
+                                                            RegExp(
+                                                              r'^Exception:\s*',
+                                                            ),
+                                                            '',
+                                                          )
+                                                          .trim();
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(
+                                                            errorMsg,
+                                                          ),
+                                                          backgroundColor:
+                                                              AppColors.danger,
+                                                        ),
+                                                      );
+                                                    }
+                                                  }
+                                                },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: isCheckedIn
+                                                ? AppColors.danger
+                                                : AppColors.primary,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 18,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            elevation: 0,
+                                          ),
+                                          child: isLoading
+                                              ? const SizedBox(
+                                                  height: 24,
+                                                  width: 24,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: Colors.white,
+                                                      ),
+                                                )
+                                              : Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                      isCheckedIn
+                                                          ? Icons.logout
+                                                          : Icons.login,
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Text(
+                                                      isCheckedIn
+                                                          ? 'Check Out'
+                                                          : 'Check In',
+                                                      style: const TextStyle(
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ),
                               ],
                             );
                           },
                         ),
+
+                        const SizedBox(height: 32),
+
+                        // Timeline Section
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "TODAY'S TIMELINE",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.5,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : Colors.grey.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              StreamBuilder<
+                                QuerySnapshot<Map<String, dynamic>>
+                              >(
+                                stream: _historyStream,
+                                builder: (context, snapshot) {
+                                  String punchIn = '--:--';
+                                  if (snapshot.hasData &&
+                                      snapshot.data!.docs.isNotEmpty) {
+                                    final today = DateTime.now();
+                                    for (final doc in snapshot.data!.docs) {
+                                      final checkIn =
+                                          (doc.data()['checkIn'] as Timestamp?)
+                                              ?.toDate();
+                                      if (checkIn != null &&
+                                          checkIn.day == today.day &&
+                                          checkIn.month == today.month &&
+                                          checkIn.year == today.year) {
+                                        punchIn = DateFormat(
+                                          'hh:mm a',
+                                        ).format(checkIn);
+                                        break;
+                                      }
+                                    }
+                                  }
+                                  String punchOut = '--:--';
+                                  if (snapshot.hasData &&
+                                      snapshot.data!.docs.isNotEmpty) {
+                                    final today = DateTime.now();
+                                    for (final doc in snapshot.data!.docs) {
+                                      final checkIn =
+                                          (doc.data()['checkIn'] as Timestamp?)
+                                              ?.toDate();
+                                      final checkOut =
+                                          (doc.data()['checkOut'] as Timestamp?)
+                                              ?.toDate();
+                                      if (checkIn != null &&
+                                          checkIn.day == today.day &&
+                                          checkIn.month == today.month &&
+                                          checkIn.year == today.year &&
+                                          checkOut != null) {
+                                        punchOut = DateFormat(
+                                          'hh:mm a',
+                                        ).format(checkOut);
+                                        break;
+                                      }
+                                    }
+                                  }
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        child: _TimelineCard(
+                                          icon: Icons.login,
+                                          label: 'Punch In',
+                                          value: punchIn,
+                                          isDark: isDark,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _TimelineCard(
+                                          icon: Icons.logout,
+                                          label: 'Punch Out',
+                                          value: punchOut,
+                                          isDark: isDark,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Summary Section
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'MONTHLY SUMMARY',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.5,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : Colors.grey.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              StreamBuilder<
+                                QuerySnapshot<Map<String, dynamic>>
+                              >(
+                                stream: _historyStream,
+                                builder: (context, snapshot) {
+                                  int present = 0;
+                                  final now = DateTime.now();
+                                  if (snapshot.hasData) {
+                                    present = snapshot.data!.docs.where((doc) {
+                                      final tc =
+                                          (doc.data()['checkIn'] as Timestamp?)
+                                              ?.toDate();
+                                      return tc != null &&
+                                          tc.month == now.month &&
+                                          tc.year == now.year;
+                                    }).length;
+                                  }
+
+                                  // Calculate workdays elapsed this month (Mon-Fri)
+                                  int workdaysElapsed = 0;
+                                  for (int d = 1; d <= now.day; d++) {
+                                    final date = DateTime(
+                                      now.year,
+                                      now.month,
+                                      d,
+                                    );
+                                    if (date.weekday <= 5) workdaysElapsed++;
+                                  }
+                                  // Don't count today if not checked in yet
+                                  final absent = (workdaysElapsed - present)
+                                      .clamp(0, workdaysElapsed);
+
+                                  return StreamBuilder<
+                                    QuerySnapshot<Map<String, dynamic>>
+                                  >(
+                                    stream: FirebaseFirestore.instance
+                                        .collection('leaveRequests')
+                                        .where('userId', isEqualTo: user.id)
+                                        .where('status', isEqualTo: 'Diterima')
+                                        .snapshots(),
+                                    builder: (context, leaveSnap) {
+                                      int leaves = 0;
+                                      if (leaveSnap.hasData) {
+                                        leaves = leaveSnap.data!.docs.where((
+                                          doc,
+                                        ) {
+                                          final created =
+                                              (doc.data()['createdAt']
+                                                      as Timestamp?)
+                                                  ?.toDate();
+                                          return created != null &&
+                                              created.month == now.month &&
+                                              created.year == now.year;
+                                        }).length;
+                                      }
+                                      return Row(
+                                        children: [
+                                          Expanded(
+                                            child: _SummaryCard(
+                                              value: '$present',
+                                              label: 'Present',
+                                              valueColor: AppColors.primary,
+                                              isDark: isDark,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: _SummaryCard(
+                                              value: '$absent',
+                                              label: 'Absent',
+                                              valueColor: AppColors.danger,
+                                              isDark: isDark,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: _SummaryCard(
+                                              value: '$leaves',
+                                              label: 'Leaves',
+                                              valueColor: AppColors.success,
+                                              isDark: isDark,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Announcements Section
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ANNOUNCEMENTS',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.5,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : Colors.grey.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              const AnnouncementFeed(),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Actions
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _EmployeeActionButton(
+                                  icon: Icons.event_busy,
+                                  label: 'Leave Request',
+                                  isDark: isDark,
+                                  onTap: () => context.push('/leave'),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _EmployeeActionButton(
+                                  icon: Icons.history,
+                                  label: 'Work History',
+                                  isDark: isDark,
+                                  onTap: () =>
+                                      context.push('/attendance/history'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-
-                  const SizedBox(height: 32),
-
-                  // Summary Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'MONTHLY SUMMARY',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.5,
-                            color: isDark
-                                ? Colors.white70
-                                : Colors.grey.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: _historyStream,
-                          builder: (context, snapshot) {
-                            int present = 0;
-                            if (snapshot.hasData) {
-                              final now = DateTime.now();
-                              present = snapshot.data!.docs.where((doc) {
-                                final tc = (doc.data()['checkIn'] as Timestamp?)
-                                    ?.toDate();
-                                return tc != null &&
-                                    tc.month == now.month &&
-                                    tc.year == now.year;
-                              }).length;
-                            }
-                            return Row(
-                              children: [
-                                Expanded(
-                                  child: _SummaryCard(
-                                    value: '$present',
-                                    label: 'Present',
-                                    valueColor: AppColors.primary,
-                                    isDark: isDark,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _SummaryCard(
-                                    value: '0',
-                                    label: 'Absent',
-                                    valueColor: AppColors.danger,
-                                    isDark: isDark,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _SummaryCard(
-                                    value: '0',
-                                    label: 'Leaves',
-                                    valueColor: AppColors.success,
-                                    isDark: isDark,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Actions
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _EmployeeActionButton(
-                            icon: Icons.event_busy,
-                            label: 'Leave Request',
-                            isDark: isDark,
-                            onTap: () => context.push('/leave'),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _EmployeeActionButton(
-                            icon: Icons.history,
-                            label: 'Work History',
-                            isDark: isDark,
-                            onTap: () => context.push('/attendance/history'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ),
+
+          // Index 1: Attendance Calendar
+          const AttendanceCalendarScreen(),
+
+          // Index 2: Leave Request
+          const LeaveRequestScreen(showAppBar: false),
+
+          // Index 3: Profile
+          const ProfileScreen(showAppBar: false),
+        ],
       ),
 
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _navIndex,
         onTap: (index) {
-          if (index == 0) return;
+          if (index == _navIndex) return;
           HapticFeedback.lightImpact();
-          switch (index) {
-            case 1:
-              context.push('/attendance/history');
-              break;
-            case 2:
-              context.push('/leave');
-              break;
-            case 3:
-              context.push('/profile');
-              break;
-          }
-          if (mounted) setState(() => _navIndex = 0);
+          setState(() => _navIndex = index);
         },
         items: const [
           BottomNavigationBarItem(
@@ -1714,123 +2077,6 @@ class _AttendanceTrendChart extends ConsumerWidget {
   }
 }
 
-class _RecentCheckInCard extends StatelessWidget {
-  const _RecentCheckInCard({
-    required this.name,
-    required this.department,
-    required this.time,
-    required this.status,
-    required this.isDark,
-  });
-
-  final String name;
-  final String department;
-  final String time;
-  final String status;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    Color statusBgColor;
-    Color statusTextColor;
-
-    switch (status.toLowerCase()) {
-      case 'late':
-        statusBgColor = AppColors.warning.withOpacity(0.2);
-        statusTextColor = AppColors.warning;
-        break;
-      case 'absent':
-        statusBgColor = AppColors.danger.withOpacity(0.2);
-        statusTextColor = AppColors.danger;
-        break;
-      default:
-        statusBgColor = AppColors.success.withOpacity(0.2);
-        statusTextColor = AppColors.success;
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? AppColors.primary.withOpacity(0.1)
-              : Colors.grey.shade200,
-        ),
-      ),
-      child: Row(
-        children: [
-          // Avatar
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isDark
-                  ? AppColors.primary.withOpacity(0.2)
-                  : Colors.grey.shade100,
-              border: Border.all(
-                color: isDark
-                    ? AppColors.primary.withOpacity(0.2)
-                    : Colors.grey.shade200,
-              ),
-            ),
-            child: Icon(
-              Icons.person,
-              size: 20,
-              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Name and Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$department • $time',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Status badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusBgColor,
-              borderRadius: BorderRadius.circular(9999),
-              border: Border.all(color: statusTextColor.withOpacity(0.3)),
-            ),
-            child: Text(
-              status.toUpperCase(),
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: statusTextColor,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ─── Employee Dashboard specific widgets ───
 
 class _TimelineCard extends StatelessWidget {
@@ -2087,6 +2333,237 @@ class _LiveWorkTimerState extends State<_LiveWorkTimer> {
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
       ],
+    );
+  }
+}
+
+class _LiveAttendanceRowData {
+  final String name;
+  final DateTime? checkIn;
+  final DateTime? checkOut;
+  final String? status;
+
+  _LiveAttendanceRowData({
+    required this.name,
+    this.checkIn,
+    this.checkOut,
+    this.status,
+  });
+}
+
+class _LiveAttendanceRowItem extends StatelessWidget {
+  const _LiveAttendanceRowItem({
+    required this.data,
+    required this.isLast,
+    required this.isDark,
+  });
+
+  final _LiveAttendanceRowData data;
+  final bool isLast;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine status badge style
+    Color badgeBg;
+    Color badgeText;
+    Color badgeBorder;
+    String statusLabel = 'ABSENT';
+
+    if (data.status != null) {
+      // Map common API statuses to UI
+      final s = data.status!.toUpperCase();
+      if (s == 'CHECKED_IN' || s == 'CHECKED_OUT') {
+        statusLabel = 'PRESENT';
+        badgeBg = Colors.green.withOpacity(0.1);
+        badgeText = Colors.green;
+        badgeBorder = Colors.green.withOpacity(0.2);
+      } else if (s == 'LATE') {
+        statusLabel = 'LATE';
+        badgeBg = Colors.orange.withOpacity(0.1);
+        badgeText = Colors.orange;
+        badgeBorder = Colors.orange.withOpacity(0.2);
+      } else if (s == 'EARLY_LEAVE') {
+        statusLabel = 'LEFT EARLY';
+        badgeBg = Colors.orange.withOpacity(0.1);
+        badgeText = Colors.orange;
+        badgeBorder = Colors.orange.withOpacity(0.2);
+      } else if (s == 'OVERTIME') {
+        statusLabel = 'OVERTIME';
+        badgeBg = Colors.blue.withOpacity(0.1);
+        badgeText = Colors.blue;
+        badgeBorder = Colors.blue.withOpacity(0.2);
+      } else {
+        statusLabel = s;
+        badgeBg = Colors.grey.withOpacity(0.1);
+        badgeText = Colors.grey;
+        badgeBorder = Colors.grey.withOpacity(0.2);
+      }
+    } else {
+      // No log found -> Absent
+      statusLabel = 'ABSENT';
+      badgeBg = Colors.red.withOpacity(0.1);
+      badgeText = Colors.red;
+      badgeBorder = Colors.red.withOpacity(0.2);
+    }
+
+    final checkInStr = data.checkIn != null
+        ? DateFormat('hh:mm a').format(data.checkIn!)
+        : '--:--';
+    final checkOutStr = data.checkOut != null
+        ? DateFormat('hh:mm a').format(data.checkOut!)
+        : '--:--';
+
+    // Status text color if not set (fallback)
+    badgeText = isDark ? badgeText.withOpacity(0.9) : badgeText;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : Border(
+                bottom: BorderSide(
+                  color: isDark
+                      ? AppColors.primary.withOpacity(0.05)
+                      : Colors.grey.shade100,
+                ),
+              ),
+      ),
+      child: Row(
+        children: [
+          // Name + Avatar
+          Expanded(
+            flex: 3,
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      data.name.isNotEmpty ? data.name[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    data.name,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.grey.shade800,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Check In
+          Expanded(
+            flex: 2,
+            child: Text(
+              checkInStr,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+              ),
+            ),
+          ),
+
+          // Check Out
+          Expanded(
+            flex: 2,
+            child: Text(
+              checkOutStr,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+              ),
+            ),
+          ),
+
+          // Status Badge
+          Expanded(
+            flex: 2,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: badgeBorder),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: badgeText,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Provider for today's attendance logs to prevent rebuilding on scroll
+final todayAttendanceLogsProvider =
+    StreamProvider.autoDispose<QuerySnapshot<Map<String, dynamic>>>((ref) {
+      final repo = ref.watch(attendanceRepositoryProvider);
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final todayEnd = todayStart.add(const Duration(days: 1));
+      return repo.streamLogsForRange(todayStart, todayEnd);
+    });
+
+class _LiveBadge extends StatelessWidget {
+  const _LiveBadge({super.key, required this.isDark, required this.isOnline});
+
+  final bool isDark;
+  final bool isOnline;
+
+  @override
+  Widget build(BuildContext context) {
+    // Green for online, Red for offline
+    final color = isOnline ? Colors.green : Colors.red;
+
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
     );
   }
 }

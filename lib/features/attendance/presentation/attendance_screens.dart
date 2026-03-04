@@ -11,6 +11,8 @@ import '../../../core/widgets/app_background.dart';
 import '../../attendance/application/attendance_controller.dart';
 import '../../attendance/data/attendance_repository.dart';
 import '../../attendance/data/wifi_network_repository.dart';
+import 'package:intl/intl.dart';
+import '../../attendance/data/attendance_status.dart';
 import '../../auth/data/user_providers.dart';
 
 class AttendanceScreen extends ConsumerStatefulWidget {
@@ -84,6 +86,13 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         _wifiError = null;
       }
     });
+  }
+
+  String _cleanErrorMessage(String raw) {
+    return raw
+        .replaceFirst(RegExp(r'^Exception:\s*'), '')
+        .replaceFirst(RegExp(r'^Error:\s*'), '')
+        .trim();
   }
 
   @override
@@ -521,9 +530,81 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
+                      const SizedBox(height: 10),
+                      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: user == null
+                            ? Stream.empty()
+                            : ref
+                                  .read(attendanceRepositoryProvider)
+                                  .streamActiveSession(user.id),
+                        builder: (context, snapshot) {
+                          final hasActiveSession =
+                              snapshot.hasData &&
+                              snapshot.data!.docs.isNotEmpty;
+
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24),
+                                child: LinearProgressIndicator(),
+                              ),
+                            );
+                          }
+
+                          if (snapshot.hasError) {
+                            // Treat stream error as no active session - still show Check-in
+                            // so user can attempt check-in (e.g. if index missing)
+                          }
+
+                          if (hasActiveSession && !snapshot.hasError) {
+                            return SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  await ref
+                                      .read(
+                                        attendanceControllerProvider.notifier,
+                                      )
+                                      .checkOut(user!);
+                                  // State handling...
+                                  if (!context.mounted) return;
+                                  final state = ref.read(
+                                    attendanceControllerProvider,
+                                  );
+                                  if (state.hasError) {
+                                    final errMsg = _cleanErrorMessage(
+                                      state.error.toString(),
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(errMsg),
+                                        backgroundColor: Colors.red,
+                                        duration: const Duration(seconds: 5),
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Check-out berhasil!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.logout),
+                                label: const Text('Check-out'),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          return SizedBox(
+                            width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed:
                                   (user == null ||
@@ -554,16 +635,20 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                                               attendanceControllerProvider
                                                   .notifier,
                                             )
-                                            .checkIn(user);
+                                            .checkIn(
+                                              user,
+                                              manualSsid: _currentSsid,
+                                              manualBssid: _currentBssid,
+                                            );
 
-                                        if (!mounted) return;
+                                        if (!context.mounted) return;
                                         final state = ref.read(
                                           attendanceControllerProvider,
                                         );
                                         if (state.hasError) {
-                                          final errorMsg = state.error
-                                              .toString();
-                                          // Check if it's a WiFi validation error
+                                          final errorMsg = _cleanErrorMessage(
+                                            state.error.toString(),
+                                          );
                                           if (errorMsg.contains(
                                                 'Check-in ditolak',
                                               ) ||
@@ -601,94 +686,33 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                                               backgroundColor: Colors.green,
                                             ),
                                           );
-                                          // Clear inputs after successful check-in
-                                          _ssidController.clear();
-                                          _bssidController.clear();
-                                          setState(() {
-                                            _currentSsid = null;
-                                            _currentBssid = null;
-                                          });
+                                          // Do NOT clear WiFi - keeps UI responsive
+                                          // Stream will update and show Check-out button
+                                          setState(() {});
                                         }
                                       } catch (e) {
-                                        if (!mounted) return;
-                                        final errorMsg = e.toString();
-                                        if (errorMsg.contains(
-                                              'Check-in ditolak',
-                                            ) ||
-                                            errorMsg.contains(
-                                              'tidak terhubung',
-                                            )) {
-                                          setState(() {
-                                            _wifiError = errorMsg.replaceAll(
-                                              'Check-in ditolak: ',
-                                              '',
-                                            );
-                                            _currentSsid = null;
-                                            _currentBssid = null;
-                                          });
-                                        }
+                                        // Catch unexpected errors
+                                        if (!context.mounted) return;
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(
                                           SnackBar(
-                                            content: Text(errorMsg),
+                                            content: Text(e.toString()),
                                             backgroundColor: Colors.red,
-                                            duration: const Duration(
-                                              seconds: 5,
-                                            ),
                                           ),
                                         );
                                       }
                                     },
                               icon: const Icon(Icons.login),
                               label: const Text('Check-in'),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: user == null
-                                  ? null
-                                  : () async {
-                                      await ref
-                                          .read(
-                                            attendanceControllerProvider
-                                                .notifier,
-                                          )
-                                          .checkOut(user);
-                                      if (!mounted) return;
-                                      final state = ref.read(
-                                        attendanceControllerProvider,
-                                      );
-                                      if (state.hasError) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              state.error.toString(),
-                                            ),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      } else {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Check-out berhasil!',
-                                            ),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                      }
-                                    },
-                              icon: const Icon(Icons.logout),
-                              label: const Text('Check-out'),
-                            ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -719,7 +743,36 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                               child: LinearProgressIndicator(),
                             );
                           }
-                          final docs = snapshot.data?.docs ?? [];
+                          if (snapshot.hasError) {
+                            return Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Text(
+                                'Error: ${snapshot.error}',
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            );
+                          }
+                          var docs =
+                              List<
+                                QueryDocumentSnapshot<Map<String, dynamic>>
+                              >.from(snapshot.data?.docs ?? []);
+
+                          // Sort client-side (descending)
+                          docs.sort((a, b) {
+                            final aTime =
+                                (a.data()['checkIn'] as Timestamp?)?.toDate() ??
+                                DateTime(0);
+                            final bTime =
+                                (b.data()['checkIn'] as Timestamp?)?.toDate() ??
+                                DateTime(0);
+                            return bTime.compareTo(aTime);
+                          });
+
+                          // Limit to 50
+                          if (docs.length > 50) {
+                            docs = docs.sublist(0, 50);
+                          }
+
                           if (docs.isEmpty) {
                             return const ListTile(
                               title: Text('Belum ada data absensi'),
@@ -732,19 +785,212 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                                   ?.toDate();
                               final checkOut = (data['checkOut'] as Timestamp?)
                                   ?.toDate();
-                              final method = data['method'] ?? '-';
-                              final wifiSsid = data['wifiSsid'] as String?;
-                              final wifiBssid = data['wifiBssid'] as String?;
-                              return ListTile(
-                                leading: const Icon(Icons.access_time),
-                                title: Text('Metode: $method'),
-                                subtitle: Text(
-                                  'In: ${checkIn ?? '-'}\n'
-                                  'Out: ${checkOut ?? '-'}'
-                                  '${wifiSsid != null ? '\nWiFi: $wifiSsid' : ''}'
-                                  '${wifiBssid != null ? '\nBSSID: $wifiBssid' : ''}',
+                              // final method = data['method'] ?? '-';
+                              final statusStr = data['status'] as String?;
+                              final status = AttendanceStatus.fromString(
+                                statusStr,
+                              );
+
+                              final workDuration =
+                                  data['workDuration'] as int? ?? 0;
+                              final overtimeDuration =
+                                  data['overtimeDuration'] as int? ?? 0;
+                              final approvalStatus =
+                                  data['approvalStatus'] as String?;
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            DateFormat(
+                                              'EEEE, d MMM yyyy',
+                                              'id_ID',
+                                            ).format(checkIn ?? DateTime.now()),
+                                            style: textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: status.color.withOpacity(
+                                                0.1,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color: status.color,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              status.label,
+                                              style: textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: status.color,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Divider(),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Masuk',
+                                                  style: textTheme.bodySmall
+                                                      ?.copyWith(
+                                                        color: Colors.grey,
+                                                      ),
+                                                ),
+                                                Text(
+                                                  checkIn != null
+                                                      ? DateFormat(
+                                                          'HH:mm',
+                                                        ).format(checkIn)
+                                                      : '-',
+                                                  style: textTheme.bodyLarge,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Keluar',
+                                                  style: textTheme.bodySmall
+                                                      ?.copyWith(
+                                                        color: Colors.grey,
+                                                      ),
+                                                ),
+                                                Text(
+                                                  checkOut != null
+                                                      ? DateFormat(
+                                                          'HH:mm',
+                                                        ).format(checkOut)
+                                                      : '-',
+                                                  style: textTheme.bodyLarge,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  'Durasi',
+                                                  style: textTheme.bodySmall
+                                                      ?.copyWith(
+                                                        color: Colors.grey,
+                                                      ),
+                                                ),
+                                                Text(
+                                                  '${(workDuration / 60).toStringAsFixed(1)} jam',
+                                                  style: textTheme.bodyMedium
+                                                      ?.copyWith(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (overtimeDuration > 0) ...[
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.withOpacity(
+                                              0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.av_timer,
+                                                size: 16,
+                                                color: Colors.orange,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Lembur: ${(overtimeDuration / 60).toStringAsFixed(1)} jam',
+                                                style: textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: Colors.orange[800],
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                              ),
+                                              const Spacer(),
+                                              if (approvalStatus == 'pending')
+                                                Text(
+                                                  'Menunggu Persetujuan',
+                                                  style: textTheme.bodySmall
+                                                      ?.copyWith(
+                                                        color:
+                                                            Colors.orange[800],
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                      ),
+                                                )
+                                              else if (approvalStatus ==
+                                                  'approved')
+                                                Text(
+                                                  'Disetujui',
+                                                  style: textTheme.bodySmall
+                                                      ?.copyWith(
+                                                        color:
+                                                            Colors.green[800],
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                )
+                                              else if (approvalStatus ==
+                                                  'rejected')
+                                                Text(
+                                                  'Ditolak',
+                                                  style: textTheme.bodySmall
+                                                      ?.copyWith(
+                                                        color: Colors.red[800],
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
-                                isThreeLine: true,
                               );
                             }).toList(),
                           );
@@ -768,9 +1014,9 @@ class AttendanceHistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).valueOrNull;
-    final Stream<QuerySnapshot<Map<String, dynamic>>> logsStream = user == null
+    final logsStream = user == null
         ? Stream<QuerySnapshot<Map<String, dynamic>>>.empty()
-        : ref.watch(attendanceRepositoryProvider).streamUserLogs(user.id);
+        : ref.read(attendanceRepositoryProvider).streamUserLogs(user.id);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -786,42 +1032,269 @@ class AttendanceHistoryScreen extends ConsumerWidget {
         title: const Text('Riwayat Absensi'),
       ),
       body: AppBackground(
-        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: logsStream,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const LinearProgressIndicator();
-            }
-            final docs = snapshot.data?.docs ?? [];
-            if (docs.isEmpty) {
-              return const Center(child: Text('Belum ada data absensi'));
-            }
+        child: user == null
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('Data user tidak tersedia'),
+                ),
+              )
+            : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: logsStream,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 48,
+                              color: Colors.red.shade700,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Gagal memuat riwayat',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${snapshot.error}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  var docs = List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(
+                    snapshot.data?.docs ?? [],
+                  );
+
+                  docs.sort((a, b) {
+                    final aTime = (a.data()['checkIn'] as Timestamp?)?.toDate() ??
+                        DateTime(0);
+                    final bTime = (b.data()['checkIn'] as Timestamp?)?.toDate() ??
+                        DateTime(0);
+                    return bTime.compareTo(aTime);
+                  });
+
+                  if (docs.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.history,
+                              size: 64,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.4),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Belum ada data absensi',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Riwayat check-in/out Anda akan muncul di sini',
+                              style: Theme.of(context).textTheme.bodySmall,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
             return ListView.separated(
               padding: const EdgeInsets.all(16),
               itemBuilder: (context, index) {
                 final data = docs[index].data();
                 final checkIn = (data['checkIn'] as Timestamp?)?.toDate();
                 final checkOut = (data['checkOut'] as Timestamp?)?.toDate();
-                final method = data['method'] ?? '-';
-                final wifiSsid = data['wifiSsid'] as String?;
-                final wifiBssid = data['wifiBssid'] as String?;
+                // method is unused in UI for now, but good to have
+                // final method = data['method'] ?? '-';
+
+                final statusStr = data['status'] as String?;
+                final status = AttendanceStatus.fromString(statusStr);
+
+                final workDuration = data['workDuration'] as int? ?? 0;
+                final overtimeDuration = data['overtimeDuration'] as int? ?? 0;
+                final approvalStatus = data['approvalStatus'] as String?;
+
+                final textTheme = Theme.of(context).textTheme;
+
                 return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.accent.withOpacity(0.15),
-                      child: const Icon(
-                        Icons.wifi_lock,
-                        color: AppColors.accent,
-                      ),
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              DateFormat(
+                                'EEEE, d MMM yyyy',
+                                'id_ID',
+                              ).format(checkIn ?? DateTime.now()),
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: status.color.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: status.color),
+                              ),
+                              child: Text(
+                                status.label,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: status.color,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Masuk',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    checkIn != null
+                                        ? DateFormat('HH:mm').format(checkIn)
+                                        : '-',
+                                    style: textTheme.bodyLarge,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Keluar',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    checkOut != null
+                                        ? DateFormat('HH:mm').format(checkOut)
+                                        : '-',
+                                    style: textTheme.bodyLarge,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'Durasi',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${(workDuration / 60).toStringAsFixed(1)} jam',
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (overtimeDuration > 0) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.av_timer,
+                                  size: 16,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Lembur: ${(overtimeDuration / 60).toStringAsFixed(1)} jam',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: Colors.orange[800],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const Spacer(),
+                                if (approvalStatus == 'pending')
+                                  Text(
+                                    'Menunggu',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.orange[800],
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  )
+                                else if (approvalStatus == 'approved')
+                                  Text(
+                                    'Disetujui',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.green[800],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                else if (approvalStatus == 'rejected')
+                                  Text(
+                                    'Ditolak',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.red[800],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    title: Text('Metode: $method'),
-                    subtitle: Text(
-                      'In: ${checkIn ?? '-'}\n'
-                      'Out: ${checkOut ?? '-'}'
-                      '${wifiSsid != null ? '\nWiFi: $wifiSsid' : ''}'
-                      '${wifiBssid != null ? '\nBSSID: $wifiBssid' : ''}',
-                    ),
-                    isThreeLine: true,
                   ),
                 );
               },

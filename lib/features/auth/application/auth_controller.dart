@@ -5,9 +5,9 @@ import '../data/user_model.dart';
 
 final authControllerProvider =
     StateNotifierProvider<AuthController, AsyncValue<void>>((ref) {
-  final repo = ref.watch(authRepositoryProvider);
-  return AuthController(repo);
-});
+      final repo = ref.watch(authRepositoryProvider);
+      return AuthController(repo);
+    });
 
 class AuthController extends StateNotifier<AsyncValue<void>> {
   AuthController(this._repo) : super(const AsyncData(null));
@@ -21,11 +21,9 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncLoading();
     late AppUser user;
-    state = await AsyncValue.guard(
-      () async {
-        user = await _repo.loginAuto(email: email, password: password);
-      },
-    );
+    state = await AsyncValue.guard(() async {
+      user = await _repo.loginAuto(email: email, password: password);
+    });
     if (state.hasError) {
       throw state.error!;
     }
@@ -110,7 +108,9 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> sendPasswordResetEmail(String email) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _repo.sendPasswordResetEmail(email: email));
+    state = await AsyncValue.guard(
+      () => _repo.sendPasswordResetEmail(email: email),
+    );
   }
 
   Future<void> employeeLogin({
@@ -148,7 +148,12 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> signOut() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _repo.signOut());
+    try {
+      await _repo.signOut();
+    } catch (_) {
+      // Sign-out should always succeed from the app's perspective
+    }
+    currentUserCache = null;
+    state = const AsyncData(null);
   }
 }
-

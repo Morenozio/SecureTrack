@@ -8,10 +8,13 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/animated_page.dart';
 import '../data/attendance_repository.dart';
+import '../../attendance/data/attendance_status.dart';
 import '../../auth/data/user_providers.dart';
 
 class AttendanceManagementScreen extends ConsumerStatefulWidget {
-  const AttendanceManagementScreen({super.key});
+  const AttendanceManagementScreen({super.key, this.showAppBar = true});
+
+  final bool showAppBar;
 
   @override
   ConsumerState<AttendanceManagementScreen> createState() =>
@@ -37,26 +40,38 @@ class _AttendanceManagementScreenState
       backgroundColor: isDark
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              context.go('/dashboard/admin');
-            }
-          },
-        ),
-        title: const Text('Attendance Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.file_download_outlined),
-            tooltip: 'Export CSV',
-            onPressed: () => _exportCsv(context),
-          ),
-        ],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    context.go('/dashboard/admin');
+                  }
+                },
+              ),
+              title: const Text('Attendance Management'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.file_download_outlined),
+                  tooltip: 'Export CSV',
+                  onPressed: () => _exportCsv(context),
+                ),
+              ],
+            )
+          : AppBar(
+              title: const Text('Attendance Management'),
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.file_download_outlined),
+                  tooltip: 'Export CSV',
+                  onPressed: () => _exportCsv(context),
+                ),
+              ],
+            ),
       body: AnimatedPage(
         child: Column(
           children: [
@@ -164,12 +179,13 @@ class _AttendanceManagementScreenState
                           value: _statusFilter,
                           items: const [
                             'All',
-                            'Present',
+                            'Present', // Maps to CheckedIn/CheckedOut
                             'Late',
                             'Absent',
-                            'On Leave',
+                            'Early Leave', // Maps to Pulang Awal
+                            'Overtime', // Maps to Lembur
                           ],
-                          prefix: 'Status: ',
+                          prefix: '',
                           isDark: isDark,
                           onChanged: (v) =>
                               setState(() => _statusFilter = v ?? 'All'),
@@ -247,26 +263,41 @@ class _AttendanceManagementScreenState
                         final att = attendanceByUser[userId];
 
                         String status;
+                        AttendanceStatus? attendanceStatus;
                         DateTime? checkIn;
                         DateTime? checkOut;
 
                         if (att != null) {
                           checkIn = (att['checkIn'] as Timestamp?)?.toDate();
                           checkOut = (att['checkOut'] as Timestamp?)?.toDate();
-                          if (checkIn != null &&
-                              checkIn.hour >= 9 &&
-                              checkIn.minute > 0) {
-                            status = 'Late';
+
+                          // Use the status field from Firestore if available
+                          final statusStr = att['status'] as String?;
+                          if (statusStr != null) {
+                            attendanceStatus = AttendanceStatus.fromString(
+                              statusStr,
+                            );
+                            status = attendanceStatus.label;
                           } else {
-                            status = 'Present';
+                            // Fallback logic for old data
+                            if (checkIn != null &&
+                                checkIn.hour >= 9 &&
+                                checkIn.minute > 15) {
+                              // 15 min tolerance hardcoded fallback
+                              status = 'Late';
+                              attendanceStatus = AttendanceStatus.late;
+                            } else {
+                              status = 'Present';
+                              attendanceStatus = AttendanceStatus.checkedIn;
+                            }
                           }
                         } else {
                           status = 'Absent';
+                          attendanceStatus = AttendanceStatus.absent;
                         }
 
-                        // Check if on leave
-                        // (simplified — checks leave collection)
-                        // For now just use attendance data
+                        // Check if on leave (placeholder)
+                        // ...
 
                         rows.add(
                           _AttendanceRow(
@@ -274,6 +305,8 @@ class _AttendanceManagementScreenState
                             name: name,
                             department: dept,
                             status: status,
+                            attendanceStatus:
+                                attendanceStatus, // Pass enum for better handling
                             checkIn: checkIn,
                             checkOut: checkOut,
                           ),
@@ -283,19 +316,54 @@ class _AttendanceManagementScreenState
                       // Apply status filter
                       final displayRows = _statusFilter == 'All'
                           ? rows
-                          : rows
-                                .where((r) => r.status == _statusFilter)
-                                .toList();
+                          : rows.where((r) {
+                              if (_statusFilter == 'Present') {
+                                return r.status == 'Present' ||
+                                    r.attendanceStatus ==
+                                        AttendanceStatus.checkedIn ||
+                                    r.attendanceStatus ==
+                                        AttendanceStatus.checkedOut;
+                              }
+                              if (_statusFilter == 'Late') {
+                                return r.status == 'Late' ||
+                                    r.attendanceStatus == AttendanceStatus.late;
+                              }
+                              if (_statusFilter == 'Absent') {
+                                return r.status == 'Absent' ||
+                                    r.attendanceStatus ==
+                                        AttendanceStatus.absent;
+                              }
+                              if (_statusFilter == 'Early Leave') {
+                                return r.attendanceStatus ==
+                                    AttendanceStatus.earlyLeave;
+                              }
+                              if (_statusFilter == 'Overtime') {
+                                return r.attendanceStatus ==
+                                    AttendanceStatus.overtime;
+                              }
+                              return false;
+                            }).toList();
 
                       // Count summary
                       final presentCount = rows
-                          .where((r) => r.status == 'Present')
+                          .where(
+                            (r) =>
+                                r.attendanceStatus ==
+                                    AttendanceStatus.checkedIn ||
+                                r.attendanceStatus ==
+                                    AttendanceStatus.checkedOut,
+                          )
                           .length;
                       final lateCount = rows
-                          .where((r) => r.status == 'Late')
+                          .where(
+                            (r) => r.attendanceStatus == AttendanceStatus.late,
+                          )
                           .length;
                       final absentCount = rows
-                          .where((r) => r.status == 'Absent')
+                          .where(
+                            (r) =>
+                                r.attendanceStatus == AttendanceStatus.absent,
+                          )
                           .length;
 
                       return Column(
@@ -423,6 +491,7 @@ class _AttendanceRow {
   final String name;
   final String department;
   final String status;
+  final AttendanceStatus? attendanceStatus;
   final DateTime? checkIn;
   final DateTime? checkOut;
 
@@ -431,6 +500,7 @@ class _AttendanceRow {
     required this.name,
     required this.department,
     required this.status,
+    this.attendanceStatus,
     this.checkIn,
     this.checkOut,
   });
@@ -542,22 +612,29 @@ class _AttendanceRowCard extends StatelessWidget {
   Widget build(BuildContext context) {
     Color statusColor;
     IconData statusIcon;
-    switch (row.status) {
-      case 'Present':
-        statusColor = AppColors.success;
+    // Use proper enum values for better styling
+    final status = row.attendanceStatus ?? AttendanceStatus.notCheckedIn;
+
+    statusColor = status.color;
+    switch (status) {
+      case AttendanceStatus.checkedIn:
+      case AttendanceStatus.checkedOut:
         statusIcon = Icons.check_circle;
         break;
-      case 'Late':
-        statusColor = AppColors.warning;
+      case AttendanceStatus.late:
         statusIcon = Icons.schedule;
         break;
-      case 'On Leave':
-        statusColor = Colors.blue;
-        statusIcon = Icons.flight;
+      case AttendanceStatus.earlyLeave:
+        statusIcon = Icons.exit_to_app;
+        break;
+      case AttendanceStatus.overtime:
+        statusIcon = Icons.av_timer;
+        break;
+      case AttendanceStatus.absent:
+        statusIcon = Icons.cancel;
         break;
       default:
-        statusColor = AppColors.danger;
-        statusIcon = Icons.cancel;
+        statusIcon = Icons.help_outline;
     }
 
     final checkInStr = row.checkIn != null

@@ -9,7 +9,9 @@ import '../../attendance/data/attendance_repository.dart';
 import '../../auth/data/user_providers.dart';
 
 class EmployeeListScreen extends ConsumerStatefulWidget {
-  const EmployeeListScreen({super.key});
+  const EmployeeListScreen({super.key, this.showAppBar = true});
+
+  final bool showAppBar;
 
   @override
   ConsumerState<EmployeeListScreen> createState() => _EmployeeListScreenState();
@@ -33,26 +35,38 @@ class _EmployeeListScreenState extends ConsumerState<EmployeeListScreen> {
       backgroundColor: isDark
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              context.go('/dashboard/admin');
-            }
-          },
-        ),
-        title: const Text('Employee Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_add),
-            tooltip: 'Add Employee',
-            onPressed: () => context.push('/admin/add-employee'),
-          ),
-        ],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    context.go('/dashboard/admin');
+                  }
+                },
+              ),
+              title: const Text('Employee Management'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.person_add),
+                  tooltip: 'Add Employee',
+                  onPressed: () => context.push('/admin/add-employee'),
+                ),
+              ],
+            )
+          : AppBar(
+              title: const Text('Employee Management'),
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.person_add),
+                  tooltip: 'Add Employee',
+                  onPressed: () => context.push('/admin/add-employee'),
+                ),
+              ],
+            ),
       body: Column(
         children: [
           // ─── Search & Filter Bar ───
@@ -331,6 +345,9 @@ class _EmployeeListScreenState extends ConsumerState<EmployeeListScreen> {
                             onView: () => context.push(
                               '/admin/employee-attendance/$userId?name=${Uri.encodeComponent(name)}',
                             ),
+                            onSchedule: () => context.push(
+                              '/admin/work-schedule/$userId?name=${Uri.encodeComponent(name)}',
+                            ),
                             onEdit: () =>
                                 _showEditDialog(context, userId, data, isDark),
                             onDelete: () =>
@@ -521,6 +538,7 @@ class _EmployeeCard extends StatelessWidget {
     required this.attendanceRepo,
     required this.usersCollection,
     required this.onView,
+    required this.onSchedule,
     required this.onEdit,
     required this.onDelete,
   });
@@ -536,6 +554,7 @@ class _EmployeeCard extends StatelessWidget {
   final AttendanceRepository attendanceRepo;
   final CollectionReference<Map<String, dynamic>> usersCollection;
   final VoidCallback onView;
+  final VoidCallback onSchedule;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -1031,6 +1050,14 @@ class _EmployeeCard extends StatelessWidget {
                 color: AppColors.primary,
                 isDark: isDark,
                 onTap: onView,
+              ),
+              const SizedBox(width: 4),
+              _ActionIcon(
+                icon: Icons.schedule,
+                tooltip: 'Jadwal Kerja / Work Hours',
+                color: AppColors.accent,
+                isDark: isDark,
+                onTap: onSchedule,
               ),
               const SizedBox(width: 4),
               _ActionIcon(

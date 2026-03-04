@@ -15,7 +15,9 @@ import '../../auth/application/auth_controller.dart';
 import '../../auth/data/user_providers.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.showAppBar = true});
+
+  final bool showAppBar;
 
   @override
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
@@ -59,34 +61,42 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              context.go('/dashboard/employee');
-            }
-          },
-        ),
-        title: const Text('Profil'),
-        actions: [
-          IconButton(
-            tooltip: 'Ganti Tema',
-            onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(),
-            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-          ),
-          IconButton(
-            tooltip: 'Keluar',
-            onPressed: () async {
-              await ref.read(authControllerProvider.notifier).signOut();
-              if (context.mounted) context.go('/auth');
-            },
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    final role = user?.role ?? 'employee';
+                    context.go(
+                      role == 'admin'
+                          ? '/dashboard/admin'
+                          : '/dashboard/employee',
+                    );
+                  }
+                },
+              ),
+              title: const Text('Profil'),
+              actions: [
+                IconButton(
+                  tooltip: 'Ganti Tema',
+                  onPressed: () =>
+                      ref.read(themeModeProvider.notifier).toggleTheme(),
+                  icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+                ),
+                IconButton(
+                  tooltip: 'Keluar',
+                  onPressed: () async {
+                    await ref.read(authControllerProvider.notifier).signOut();
+                    if (context.mounted) context.go('/auth');
+                  },
+                  icon: const Icon(Icons.logout),
+                ),
+              ],
+            )
+          : null,
       body: AnimatedPage(
         child: AppBackground(
           child: ListView(
@@ -100,6 +110,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       backgroundColor: AppColors.accent.withOpacity(0.2),
                       backgroundImage: (user?.photoUrl ?? '').isNotEmpty
                           ? NetworkImage(user!.photoUrl!)
+                          : null,
+                      onBackgroundImageError: (user?.photoUrl ?? '').isNotEmpty
+                          ? (_, __) {} // Silently handle missing images
                           : null,
                       child: (user?.photoUrl ?? '').isEmpty
                           ? const Icon(

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
-import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/animated_page.dart';
 import '../../auth/application/auth_controller.dart';
 
@@ -14,7 +13,9 @@ final _settingsDoc = FirebaseFirestore.instance
     .doc('app_config');
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.showAppBar = true});
+
+  final bool showAppBar;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -32,6 +33,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   // Rules
   bool _requireWifi = true;
+  int _monthlyLeaveQuota = 12;
   bool _autoAbsent = true;
 
   bool _isLoading = true;
@@ -69,6 +71,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _lateThresholdMinutes = data['lateThresholdMinutes'] as int? ?? 15;
         _requireWifi = (data['requireWifi'] as bool?) ?? true;
         _autoAbsent = (data['autoAbsent'] as bool?) ?? true;
+        _monthlyLeaveQuota = data['monthlyLeaveQuota'] as int? ?? 12;
       }
     } catch (_) {
       // Use defaults on error
@@ -89,6 +92,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'lateThresholdMinutes': _lateThresholdMinutes,
         'requireWifi': _requireWifi,
         'autoAbsent': _autoAbsent,
+        'monthlyLeaveQuota': _monthlyLeaveQuota,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -119,16 +123,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              context.go('/dashboard/admin');
-            }
-          },
-        ),
+        leading: widget.showAppBar
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    context.go('/dashboard/admin');
+                  }
+                },
+              )
+            : null,
+        automaticallyImplyLeading: widget.showAppBar,
         title: const Text('Settings'),
         actions: [
           TextButton.icon(
@@ -330,32 +337,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         activeColor: AppColors.primary,
                         onChanged: (v) => setState(() => _autoAbsent = v),
                       ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ─── Appearance ───
-                  _SectionHeader(title: 'Appearance', isDark: isDark),
-                  const SizedBox(height: 12),
-                  _SettingsCard(
-                    isDark: isDark,
-                    children: [
+                      Divider(
+                        height: 1,
+                        color: isDark
+                            ? AppColors.primary.withOpacity(0.1)
+                            : Colors.grey.shade200,
+                      ),
                       ListTile(
                         leading: Icon(
-                          isDark ? Icons.dark_mode : Icons.light_mode,
+                          Icons.event_available,
                           color: AppColors.primary,
                         ),
-                        title: const Text('Dark Mode'),
-                        subtitle: Text(
-                          isDark ? 'Currently dark' : 'Currently light',
+                        title: const Text('Monthly Leave Quota'),
+                        subtitle: const Text(
+                          'Max days of leave per month per employee',
                         ),
-                        trailing: Switch(
-                          value: isDark,
-                          activeColor: AppColors.primary,
-                          onChanged: (_) => ref
-                              .read(themeModeProvider.notifier)
-                              .toggleTheme(),
+                        trailing: SizedBox(
+                          width: 64,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  if (_monthlyLeaveQuota > 0) {
+                                    setState(() => _monthlyLeaveQuota--);
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppColors.primary.withOpacity(0.4),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.remove,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$_monthlyLeaveQuota',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: () {
+                                  setState(() => _monthlyLeaveQuota++);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppColors.primary.withOpacity(0.4),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.add,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -369,6 +421,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _SettingsCard(
                     isDark: isDark,
                     children: [
+                      ListTile(
+                        leading: Icon(Icons.person, color: AppColors.primary),
+                        title: const Text('Edit Profile'),
+                        subtitle: const Text('Change name, photo & contact'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push('/admin/profile'),
+                      ),
+                      Divider(
+                        height: 1,
+                        color: isDark
+                            ? AppColors.primary.withOpacity(0.1)
+                            : Colors.grey.shade200,
+                      ),
                       ListTile(
                         leading: Icon(
                           Icons.admin_panel_settings,
@@ -404,9 +469,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           'Sign Out',
                           style: TextStyle(color: AppColors.danger),
                         ),
-                        onTap: () {
-                          ref.read(authControllerProvider.notifier).signOut();
-                          context.go('/auth');
+                        onTap: () async {
+                          await ref
+                              .read(authControllerProvider.notifier)
+                              .signOut();
+                          if (context.mounted) context.go('/auth');
                         },
                       ),
                     ],

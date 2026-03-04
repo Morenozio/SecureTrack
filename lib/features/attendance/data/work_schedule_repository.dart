@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:flutter/material.dart';
 import '../../../core/firebase/firebase_providers.dart';
+import 'work_schedule_model.dart';
 
 class WorkScheduleRepository {
   WorkScheduleRepository(this._db);
@@ -11,31 +13,58 @@ class WorkScheduleRepository {
   CollectionReference<Map<String, dynamic>> get _schedules =>
       _db.collection('workSchedules');
 
-  Future<Map<String, bool>?> getEmployeeSchedule(String userId) async {
+  Future<WorkSchedule> getEmployeeSchedule(String userId) async {
     final doc = await _schedules.doc(userId).get();
-    if (!doc.exists || doc.data() == null) return null;
-    final data = doc.data()!;
-    return {
-      'monday': (data['monday'] ?? true) as bool,
-      'tuesday': (data['tuesday'] ?? true) as bool,
-      'wednesday': (data['wednesday'] ?? true) as bool,
-      'thursday': (data['thursday'] ?? true) as bool,
-      'friday': (data['friday'] ?? true) as bool,
-      'saturday': (data['saturday'] ?? false) as bool,
-      'sunday': (data['sunday'] ?? false) as bool,
-    };
+    if (!doc.exists || doc.data() == null) {
+      // Return default schedule if none exists
+      return WorkSchedule(
+        shiftStart: const TimeOfDay(hour: 9, minute: 0),
+        shiftEnd: const TimeOfDay(hour: 17, minute: 0),
+        toleranceMinutes: 15,
+        minWorkingHours: 8,
+        workDays: {
+          'monday': true,
+          'tuesday': true,
+          'wednesday': true,
+          'thursday': true,
+          'friday': true,
+          'saturday': false,
+          'sunday': false,
+        },
+      );
+    }
+    return WorkSchedule.fromMap(doc.data()!);
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> streamEmployeeSchedule(String userId) {
-    return _schedules.doc(userId).snapshots();
+  Stream<WorkSchedule> streamEmployeeSchedule(String userId) {
+    return _schedules.doc(userId).snapshots().map((doc) {
+      if (!doc.exists || doc.data() == null) {
+        return WorkSchedule(
+          shiftStart: const TimeOfDay(hour: 9, minute: 0),
+          shiftEnd: const TimeOfDay(hour: 17, minute: 0),
+          toleranceMinutes: 15,
+          minWorkingHours: 8,
+          workDays: {
+            'monday': true,
+            'tuesday': true,
+            'wednesday': true,
+            'thursday': true,
+            'friday': true,
+            'saturday': false,
+            'sunday': false,
+          },
+        );
+      }
+      return WorkSchedule.fromMap(doc.data()!);
+    });
   }
 
   Future<void> setEmployeeSchedule({
     required String userId,
-    required Map<String, bool> schedule,
+    required WorkSchedule schedule,
   }) async {
     await _schedules.doc(userId).set({
-      ...schedule,
+      ...schedule.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
@@ -43,26 +72,25 @@ class WorkScheduleRepository {
   // Check if today is a workday for employee
   Future<bool> isWorkdayToday(String userId) async {
     final schedule = await getEmployeeSchedule(userId);
-    if (schedule == null) return true; // Default: all days are workdays
-    
+
     final today = DateTime.now();
     final dayOfWeek = today.weekday; // 1 = Monday, 7 = Sunday
-    
+
     switch (dayOfWeek) {
       case 1:
-        return schedule['monday'] ?? true;
+        return schedule.workDays['monday'] ?? true;
       case 2:
-        return schedule['tuesday'] ?? true;
+        return schedule.workDays['tuesday'] ?? true;
       case 3:
-        return schedule['wednesday'] ?? true;
+        return schedule.workDays['wednesday'] ?? true;
       case 4:
-        return schedule['thursday'] ?? true;
+        return schedule.workDays['thursday'] ?? true;
       case 5:
-        return schedule['friday'] ?? true;
+        return schedule.workDays['friday'] ?? true;
       case 6:
-        return schedule['saturday'] ?? false;
+        return schedule.workDays['saturday'] ?? false;
       case 7:
-        return schedule['sunday'] ?? false;
+        return schedule.workDays['sunday'] ?? false;
       default:
         return true;
     }

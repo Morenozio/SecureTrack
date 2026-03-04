@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow delete: if isAdmin();
+    }
+
+    // Admin codes
+    match /adminCodes/{code} {
+      allow read: if true;
+      allow update: if isSignedIn();
+    }
+
+    // WiFi networks
+    match /wifiNetworks/{netId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Attendance logs
+    match /attendanceLogs/{logId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Leave requests
+    match /leaveRequests/{requestId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Work Schedules - ADDED THIS SECTION
+    match /workSchedules/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Announcements
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Notifications (per-user subcollection)
+    match /notifications/{userId}/items/{notifId} {
+      allow read, delete: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn(); // admins can send to any user
+      allow update: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // App Settings
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
